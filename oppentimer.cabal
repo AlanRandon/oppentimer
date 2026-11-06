@@ -1,0 +1,22 @@
+cabal-version:   3.0
+name:            oppentimer
+version:         0.1.0.0
+license:         NONE
+author:          Alan Randon, Harry Stevens, Tinron Chan, Tom Obungu
+build-type:      Simple
+
+common warnings
+    ghc-options: -Wall
+
+executable example
+    import:           warnings
+    main-is:          Main.hs
+    other-modules:
+        Oppentimer
+    build-depends:
+        apecs,
+        apecs-gloss,
+        gloss,
+        base
+    hs-source-dirs:   src
+    default-language: Haskell2010
