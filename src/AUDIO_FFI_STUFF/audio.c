@@ -48,8 +48,9 @@ int play_audio(char filePath[]) {
     ma_decoder_uninit(&decoder);
     return 0;
 }
-
+#ifdef test
 int main() {
     play_audio("foxy-scream-fnaf-1.mp3");
     return 0;
 }
+#endif
