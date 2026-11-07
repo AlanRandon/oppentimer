@@ -6,7 +6,7 @@ import Foreign.C (CString)
 import Foreign.C.String(withCAString)
 
 
-foreign import ccall "play_audio"
+foreign import ccall safe "play_audio"
     c_play_audio :: CString -> IO CInt
 
 haskell_play_audio :: String -> IO CInt
