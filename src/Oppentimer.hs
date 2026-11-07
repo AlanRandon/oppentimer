@@ -8,11 +8,12 @@ module Oppentimer (oppentimerMain) where
 
 import Apecs hiding (Set)
 import Apecs.Gloss
-import Data.Set (Set, fromList, member, singleton)
+import Data.Set (Set, member, singleton)
 import Graphics.Gloss (BitmapData (bitmapSize))
 import Graphics.Gloss.Juicy (loadJuicyPNG)
-import Oppentimer.Clock (Clock, newClock, tickClock, viewClock)
 import System.Exit (exitSuccess)
+
+import Oppentimer.Timer (Timer, newTimer, tickTimer, viewTimer)
 
 -------------------------------------------
 -- Components
@@ -65,7 +66,7 @@ makeWorld
         , ''Collidable
         , ''Scene
         , ''VisibleInScenes
-        , ''Clock
+        , ''Timer
         ]
 
 type System' a = System Model a
@@ -255,9 +256,10 @@ createEntities = do
         -- oppentimer
         newEntity_
                 ( Pos 0 0
-                , newClock 300
+                , newTimer 300.0
                 , VisibleInScenes (singleton BattleDan)
                 )
+
         ---------------------------------------
         ---          death scene            ---
         ---------------------------------------
@@ -288,7 +290,7 @@ game = do
                 ( do
                         p1 <- view
                         p2 <- viewHitboxes
-                        p3 <- foldDraw viewClock
+                        p3 <- foldDraw viewTimer
                         pure $ pictures [p1, p2, p3]
                 )
                 inputController
@@ -296,10 +298,29 @@ game = do
                         stepPos dt
                         stepVel
                         stepCollisionBox
-                        cmap (tickClock dt)
+                        cmap (tickTimer dt)
                 )
     where
         display = InWindow "Basic" (1024, 1024) (10, 10)
+
+-- newtype TimeSeconds = TimeSeconds Float
+
+-- data Clock = Running TimeSeconds | Ended
+-- instance Component Clock where type Storage Clock = Map Clock
+
+-- newClock :: Float -> Clock
+-- newClock = Running . TimeSeconds
+
+-- tickClock :: Float -> Clock -> Clock
+-- tickClock dt (Running (TimeSeconds n)) = Running $ TimeSeconds (n - dt)
+-- tickClock _ Ended = Ended
+
+-- viewClock :: Clock -> Picture
+-- viewClock (Running (TimeSeconds n)) = text ((show minutes) ++ ":" ++ (show seconds))
+--     where
+--         minutes = (floor n :: Int) `div` 60
+--         seconds = if (n - ((fromIntegral minutes) * 60) < 10) then "0" ++ (show seconds) else show ((floor n) - (minutes * 60))
+-- viewClock (Ended) = text ("0:00")
 
 oppentimerMain :: IO ()
 oppentimerMain = do
