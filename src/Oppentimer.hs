@@ -10,7 +10,10 @@ import Apecs
 import Apecs.Gloss
 import Data.Maybe (fromMaybe)
 import Graphics.Gloss.Juicy (loadJuicyPNG)
-import Oppentimer.Clock (Clock)
+
+-- import Oppentimer.Clock (Clock)
+
+import Control.Monad (join)
 import System.Exit (exitSuccess)
 
 -------------------------------------------
@@ -54,7 +57,7 @@ makeWorld
         , ''Wall
         , ''Harry
         , ''Collidable
-        , ''Clock
+        -- , ''Clock
         ]
 
 type System' a = System Model a
@@ -101,7 +104,7 @@ stepPos dt =
                         let newPos = Pos (x + vX * dt) (y + vY * dt)
                         let newHarryBox = Collidable newPos harrySize
                         isCollision <- cfold (\acc (box :: Collidable, id' :: Entity) -> acc || (id' /= harryId && collidesWith newHarryBox box)) False
-                        if not isCollision
+                        if isCollision
                                 then pure (Pos x y, Vel 0 0)
                                 else pure (newPos, Vel vX vY)
                 )
@@ -165,13 +168,35 @@ createEntities :: System' ()
 createEntities = do
         harryBmp <- (fromMaybe (error "failed to load")) <$> (liftIO $ loadJuicyPNG "assets/characters/harry.png")
 
+        -- arena sprite
         newEntity_
-                ( Pos 0 0
-                , Wall
-                , Texture (color white $ lineLoop $ rectanglePath arenaWidth arenaHeight)
-                , Collidable (Pos 0 0) (Size arenaWidth arenaHeight)
+                ( Pos arenaX arenaY
+                , Texture (color white $ rectangleWire arenaWidth arenaHeight)
                 )
 
+        -- arena walls
+        newEntity_ -- north wall
+                ( Pos (arenaX) (arenaY + (arenaHeight / 2))
+                , Wall
+                , Collidable (Pos (arenaX) (arenaY + (arenaHeight / 2))) (Size arenaWidth 10)
+                )
+        newEntity_ -- east wall
+                ( Pos (arenaX - (arenaWidth / 2)) (arenaY)
+                , Wall
+                , Collidable (Pos (arenaX - (arenaWidth / 2)) (arenaY)) (Size 10 arenaHeight)
+                )
+        newEntity_ -- west wall
+                ( Pos (arenaX + (arenaWidth / 2)) (arenaY)
+                , Wall
+                , Collidable (Pos (arenaX + (arenaWidth / 2)) (arenaY)) (Size 10 arenaHeight)
+                )
+        newEntity_ -- south wall
+                ( Pos (arenaX) (arenaY - (arenaHeight / 2))
+                , Wall
+                , Collidable (Pos (arenaX) (arenaY - (arenaHeight / 2))) (Size arenaWidth 10)
+                )
+
+        -- harry
         newEntity_
                 ( Pos 0 0
                 , Harry
@@ -181,6 +206,7 @@ createEntities = do
                 , Collidable (Pos (-10) (-10)) (Size 20 20)
                 )
 
+        -- oppentimer
         newEntity_
                 ( Pos 0 0
                 , Texture (color white $ text "4:59")
@@ -188,6 +214,8 @@ createEntities = do
     where
         arenaWidth = 400
         arenaHeight = 200
+        arenaX = 0
+        arenaY = 0
 
 -------------------------------------------
 -- Run game
@@ -200,7 +228,7 @@ game = do
         play
                 display
                 black
-                60 -- FPS
+                60 -- fps
                 ( do
                         p1 <- view
                         p2 <- viewHitboxes

@@ -13,8 +13,8 @@ executable example
     main-is:          Main.hs
     other-modules:
         Oppentimer
-        Oppentimer.Clock
-        Cutscene
+        -- Oppentimer.Clock
+        -- Cutscene
     build-depends:
         apecs,
         apecs-gloss,
