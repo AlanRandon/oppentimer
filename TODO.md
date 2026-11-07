@@ -1,9 +1,9 @@
- - wasd
- - the oppentimer
- - some sort of background
- - enemies or some sort of bullets that do damage
- - player intreaction with objects
- - audio
- - secret bosses
- - cutscenes
- - story
+- [x] hjkl
+- [ ] the oppentimer
+- [ ] some sort of background
+- [ ] enemies or some sort of bullets that do damage
+- [ ] player intreaction with objects
+- [ ] audio
+- [ ] secret bosses
+- [ ] cutscenes
+- [ ] story
