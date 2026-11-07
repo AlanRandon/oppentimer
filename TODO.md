@@ -1,9 +1,26 @@
-- [x] hjkl
-- [ ] the oppentimer
-- [ ] some sort of background
-- [ ] enemies or some sort of bullets that do damage
-- [ ] player intreaction with objects
-- [ ] audio
-- [ ] secret bosses
-- [ ] cutscenes
-- [ ] story
+- BASICS 
+    - [x] player movement
+    - [ ] player (health, damage)
+    - [ ] player collisions
+- BATTLE SYSTEM
+    - [ ] battle UI
+    - [ ] bullet spawning
+    - [ ] bullet damage
+    - [ ] player actions (attack, damage)
+    - [ ] boss stats (attack, damage)
+- LEVELS
+    - [ ] MOVE CAMERA
+    - [ ] MOVE PLAYER
+    - [ ] CHANCE TO TRIGGER ROADMAN ENCOUNTER
+- AUDIO
+    - [ ] boss audio
+    - [ ] level audio
+    - [ ] cutscene audio
+- BOSSES
+    - [ ] TILO
+    - [ ] PAGE
+    - [ ] SAM (ALTMAN)
+    - [ ] OPPENHEIMER
+- STORY
+    - [ ] CUTSCENE SYSTEM
+    - [ ] DIALOGUE SYSTEM
