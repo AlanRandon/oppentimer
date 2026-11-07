@@ -10,6 +10,7 @@ import Apecs
 import Apecs.Gloss
 import Data.Maybe (fromMaybe)
 import Graphics.Gloss.Juicy (loadJuicyPNG)
+import Oppentimer.Clock (Clock)
 import System.Exit (exitSuccess)
 
 -------------------------------------------
@@ -53,6 +54,7 @@ makeWorld
         , ''Wall
         , ''Harry
         , ''Collidable
+        , ''Clock
         ]
 
 type System' a = System Model a
