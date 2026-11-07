@@ -11,7 +11,11 @@
       systems = nixpkgs.lib.systems.flakeExposed;
       imports = [ inputs.haskell-flake.flakeModule ];
       perSystem =
-        { self', ... }:
+        {
+          self',
+          # lib,
+          ...
+        }:
         {
           haskellProjects.default = {
             # Extra package information. See https://community.flake.parts/haskell-flake/dependency
@@ -20,7 +24,6 @@
 
             devShell = {
               enable = true;
-              mkShellArgs = { };
             };
           };
 
