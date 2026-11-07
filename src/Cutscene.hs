@@ -25,7 +25,6 @@ makeWorld
 
 type System' b c = System c
 
-draw :: Picture -> System; Picture
 
 cutsceneMain :: IO()
 
