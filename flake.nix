@@ -13,7 +13,7 @@
       perSystem =
         {
           self',
-          # lib,
+          pkgs,
           ...
         }:
         {
@@ -23,7 +23,11 @@
             settings = { };
 
             devShell = {
-              enable = true;
+              mkShellArgs = {
+                buildInputs = with pkgs; [
+                  miniaudio
+                ];
+              };
             };
           };
 

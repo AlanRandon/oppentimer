@@ -7,6 +7,8 @@ module Oppentimer (oppentimerMain) where
 
 import Apecs
 import Apecs.Gloss
+import Data.Maybe (fromMaybe)
+import Graphics.Gloss.Juicy (loadJuicyPNG)
 import System.Exit (exitSuccess)
 
 -------------------------------------------
@@ -22,11 +24,25 @@ instance Component Velocity where type Storage Velocity = Map Velocity
 data Direction = DirectionLeft | DirectionRight | DirectionUp | DirectionDown | DirectionStationary
 instance Component Direction where type Storage Direction = Map Direction
 
+data Wall = Wall
+instance Component Wall where type Storage Wall = Map Wall
+
+newtype Texture = Texture Picture
+instance Component Texture where type Storage Texture = Map Texture
+
 -------------------------------------------
 -- Model
 -------------------------------------------
 
-makeWorld "Model" [''Camera, ''Position, ''Velocity, ''Direction]
+makeWorld
+        "Model"
+        [ ''Camera
+        , ''Position
+        , ''Velocity
+        , ''Direction
+        , ''Texture
+        , ''Wall
+        ]
 
 type System' a = System Model a
 
@@ -37,8 +53,8 @@ type System' a = System Model a
 view :: System' Picture
 view =
         foldDraw -- cram everything into one picture
-                ( \(Pos (x, y)) ->
-                        translate x y $ color white $ (circle 10)
+                ( \(Pos (x, y), Texture bmp) ->
+                        translate x y $ bmp
                 )
 
 -------------------------------------------
@@ -70,12 +86,14 @@ stepVel :: Float -> System' ()
 stepVel dt =
         cmap
                 ( \(d, Vel (vX, vY)) -> case d of
-                        DirectionLeft -> Vel (-30, vY)
-                        DirectionRight -> Vel (30, vY)
-                        DirectionUp -> Vel (vX, 30)
-                        DirectionDown -> Vel (vX, -30)
+                        DirectionLeft -> Vel (-velocity, vY)
+                        DirectionRight -> Vel (velocity, vY)
+                        DirectionUp -> Vel (vX, velocity)
+                        DirectionDown -> Vel (vX, -velocity)
                         DirectionStationary -> Vel (0, 0)
                 )
+    where
+        velocity = 50
 
 -------------------------------------------
 -- Spawn entities
@@ -83,7 +101,9 @@ stepVel dt =
 
 createEntities :: System' ()
 createEntities = do
-        newEntity_ (Pos (0, 0), Vel (0, 0), DirectionStationary)
+        harryBmp <- (fromMaybe (error "failed to load")) <$> (liftIO $ loadJuicyPNG "assets/characters/harry.png")
+        newEntity_ (Pos (0, 0), Wall, Texture (color white $ lineLoop $ rectanglePath 100 100))
+        newEntity_ (Pos (0, 0), Vel (0, 0), Texture (scale 0.1 0.1 harryBmp), DirectionStationary)
 
 -------------------------------------------
 -- Run game
