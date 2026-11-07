@@ -47,21 +47,19 @@ inputController event = case event of
         EventKey (SpecialKey KeyEsc) Down _ _ ->
                 liftIO exitSuccess
         EventKey (Char 'q') Down _ _ -> liftIO exitSuccess
-        EventKey (SpecialKey KeySpace) Down _ _ -> cmap (\(Pos _) -> Pos (0, 0))
+        EventKey (SpecialKey KeySpace) Down _ _ -> cmap (\(Pos _) -> (Pos (0, 0), Vel (0, 0)))
+        EventKey (Char 'h') Down _ _ -> cmap (\(Vel (vX, vY)) -> Vel (vX - 20, vY))
+        EventKey (Char 'j') Down _ _ -> cmap (\(Vel (vX, vY)) -> Vel (vX, vY - 20))
+        EventKey (Char 'k') Down _ _ -> cmap (\(Vel (vX, vY)) -> Vel (vX, vY + 20))
+        EventKey (Char 'l') Down _ _ -> cmap (\(Vel (vX, vY)) -> Vel (vX + 20, vY))
         _ -> pure ()
 
 stepPos :: Float -> System' ()
 stepPos dt =
         cmap
-                ( \(Pos (x, y), Vel (vX, vY)) -> --search for all entities with pos and vel attributes, update
+                ( \(Pos (x, y), Vel (vX, vY)) ->
+                        -- search for all entities with pos and vel attributes, update
                         Pos (x + vX * dt, y + vY * dt)
-                )
-
-stepVel :: Float -> System' ()
-stepVel dt =
-        cmap
-                ( \(Vel (vX, vY)) ->
-                        Vel (vX * (1 + 0.25 * dt), vY)
                 )
 
 -------------------------------------------
@@ -70,8 +68,7 @@ stepVel dt =
 
 createEntities :: System' ()
 createEntities = do
-        newEntity_ (Pos (0, -50), Vel (10, 20))
-        newEntity_ (Pos (0, 50), Vel (10, -20))
+        newEntity_ (Pos (0, 0), Vel (0, 0))
 
 -------------------------------------------
 -- Run game
@@ -89,7 +86,6 @@ game = do
                 inputController
                 ( \dt -> do
                         stepPos dt
-                        stepVel dt
                 )
     where
         display = InWindow "Basic" (1024, 1024) (10, 10)
