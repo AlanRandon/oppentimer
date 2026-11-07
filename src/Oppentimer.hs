@@ -351,5 +351,5 @@ game = do
 oppentimerMain :: IO ()
 oppentimerMain = do
         w <- initModel
-	audioResult <- haskellPlayAudio "src/AUDIO_FFI_STUFF/foxy-scream-fnaf-1.mp3"
+        audioResult <- haskellPlayAudio "src/AUDIO_FFI_STUFF/foxy-scream-fnaf-1.mp3"
         runWith w game
