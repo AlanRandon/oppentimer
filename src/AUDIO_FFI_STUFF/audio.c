@@ -7,6 +7,12 @@
 #include <stdio.h>
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
+#include <pthread.h>
+#include <string.h>
+
+void hello_from_c() {
+    printf("Hello from C!\n");
+}
 
 #pragma clang diagnostic pop
 #pragma gcc diagnostic pop
@@ -23,6 +29,7 @@ void data_callback(ma_device *pDevice, void *pOutput, const void *pInput,
   (void)pInput;
 }
 
+<<<<<<< HEAD
 int play_audio(char filePath[]) {
   ma_result result;
   ma_decoder decoder;
@@ -42,6 +49,40 @@ int play_audio(char filePath[]) {
   deviceConfig.pUserData = &decoder;
   if (ma_device_init(NULL, &deviceConfig, &device) != MA_SUCCESS) {
     printf("Failed to initialise audio device\n");
+=======
+int play_audio(void* data) {
+    char* filePath = data;
+    ma_result result;
+    ma_decoder decoder;
+    ma_device_config deviceConfig;
+    ma_device device;
+
+    result = ma_decoder_init_file(filePath, NULL, &decoder);
+    if (result != MA_SUCCESS) {
+        printf("Could not load file %d\n", filePath);
+        return -1;
+    }
+    deviceConfig = ma_device_config_init(ma_device_type_playback);
+    deviceConfig.playback.format   = decoder.outputFormat;
+    deviceConfig.playback.channels = decoder.outputChannels;
+    deviceConfig.sampleRate        = decoder.outputSampleRate;
+    deviceConfig.dataCallback      = data_callback;
+    deviceConfig.pUserData         = &decoder;
+    if (ma_device_init(NULL, &deviceConfig, &device) != MA_SUCCESS) {
+        printf("Failed to initialise audio device\n");
+        ma_decoder_uninit(&decoder);
+        return -1;
+    }
+    if (ma_device_start(&device) != MA_SUCCESS) {
+        printf("Failed to start audio device\n");
+        ma_decoder_uninit(&decoder);
+        ma_device_uninit(&device);
+        return -1;
+    }
+    printf("press enter to quit\n");
+    getchar();
+    ma_device_uninit(&device);
+>>>>>>> d62d381 (do that thang)
     ma_decoder_uninit(&decoder);
     return -1;
   }
@@ -57,9 +98,21 @@ int play_audio(char filePath[]) {
   ma_decoder_uninit(&decoder);
   return 0;
 }
-#ifdef test
+
+int tPlayAudio(char filePath[]) {
+    pthread_t thread;
+    pthread_create(&thread, NULL, play_audio, filePath);
+    return 0;
+}
+
 int main() {
+<<<<<<< HEAD
   play_audio("foxy-scream-fnaf-1.mp3");
   return 0;
 }
 #endif
+=======
+    play_audio("foxy-scream-fnaf-1.mp3");
+    return 0;
+}
+>>>>>>> d62d381 (do that thang)
