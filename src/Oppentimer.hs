@@ -33,7 +33,7 @@ type System' a = System Model a
 
 view :: System' Picture
 view =
-        foldDraw
+        foldDraw -- cram everything into one picture
                 ( \(Pos (x, y)) ->
                         translate x y $ color white $ (circle 10)
                 )
@@ -53,7 +53,7 @@ inputController event = case event of
 stepPos :: Float -> System' ()
 stepPos dt =
         cmap
-                ( \(Pos (x, y), Vel (vX, vY)) ->
+                ( \(Pos (x, y), Vel (vX, vY)) -> --search for all entities with pos and vel attributes, update
                         Pos (x + vX * dt, y + vY * dt)
                 )
 
