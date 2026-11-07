@@ -42,6 +42,13 @@ instance Component Collidable where type Storage Collidable = Map Collidable
 data Harry = Harry
 instance Component Harry where type Storage Harry = Map Harry
 
+data Roadman = Roadman
+instance Component Roadman where type Storage Roadman = Map Roadman
+
+-- newdata CountDownSeconds = CountDownSeconds Float
+
+-- data RoadmanSpawner = RoadmanSpawner Float
+
 data Scene = BattleOppenheimer | Death | Win deriving (Eq, Ord)
 instance Component Scene where type Storage Scene = Map Scene
 
@@ -129,8 +136,8 @@ inputController event = case event of
         EventKey (Char _) Up _ _ -> cmap (const DirectionStationary :: Direction -> Direction)
         _ -> pure ()
 
-stepPos :: Float -> System' ()
-stepPos dt =
+stepHarryPhysics :: Float -> System' ()
+stepHarryPhysics dt = do
         cmapM
                 ( \(Collidable (Pos x y) harrySize, Vel vX vY, Harry, harryId :: Entity) -> do
                         let newPos = Pos (x + vX * dt) (y + vY * dt)
@@ -140,18 +147,8 @@ stepPos dt =
                                 then pure (Pos x y, Vel 0 0)
                                 else pure (newPos, Vel vX vY)
                 )
-
-stepCollisionBox :: System' ()
-stepCollisionBox =
         cmap
-                ( \(p :: Pos, Collidable _ size) ->
-                        Collidable p size
-                )
-
-stepVel :: System' ()
-stepVel =
-        cmap
-                ( \(d, Vel _ _) -> case d of
+                ( \(d, Vel _ _, Harry) -> case d of
                         DirectionLeft -> Vel (-velocity) 0
                         DirectionRight -> Vel velocity 0
                         DirectionUp -> Vel 0 velocity
@@ -160,6 +157,17 @@ stepVel =
                 )
     where
         velocity = 50
+
+stepRoadmanPhysics :: Float -> System' ()
+stepRoadmanPhysics dt =
+        cmap (\((Vel vX vY, Pos x y)) -> Pos (x + vX * dt) (y + vY * dt))
+
+stepCollisionBox :: System' ()
+stepCollisionBox =
+        cmap
+                ( \(p :: Pos, Collidable _ size) ->
+                        Collidable p size
+                )
 
 stepCheckWin :: System' ()
 stepCheckWin =
@@ -278,10 +286,19 @@ createEntities = do
                 , VisibleInScenes (singleton BattleOppenheimer)
                 )
 
+        -- roadman
+        SpriteData (Size roadmanWidth roadmanHeight) (Texture roadmanBmp) <- liftIO $ loadSprite 20 "assets/characters/roadman.png"
+        newEntity_
+                ( (Pos 0 0)
+                , Vel 10 0
+                , Texture roadmanBmp
+                , VisibleInScenes (singleton BattleOppenheimer)
+                )
+
         -- oppentimer
         newEntity_
                 ( Pos 0 0
-                , newTimer 10.0
+                , newTimer (5 * 60)
                 , VisibleInScenes (singleton BattleOppenheimer)
                 )
 
@@ -320,8 +337,9 @@ game = do
                 )
                 inputController
                 ( \dt -> do
-                        stepPos dt
-                        stepVel
+                        stepHarryPhysics dt
+                        stepHarryPhysics dt
+                        stepRoadmanPhysics dt
                         stepCheckWin
                         stepCollisionBox
                         cmap (tickTimer dt)
