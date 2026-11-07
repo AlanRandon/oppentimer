@@ -9,6 +9,7 @@
 #include "miniaudio.h"
 #include <pthread.h>
 #include <signal.h>
+#include <time.h>
 
 #pragma clang diagnostic pop
 #pragma gcc diagnostic pop
@@ -28,47 +29,46 @@ void data_callback(ma_device *pDevice, void *pOutput, const void *pInput,
 void *play_audio(void *data) {
   char filePath[1024] = {0};
   snprintf(filePath, sizeof(filePath), "%s", (char *)data);
-  free(data);
-  ma_result result;
-  ma_decoder decoder;
-  ma_device_config deviceConfig;
-  ma_device device;
+  // TODO: fix leak
+  // free(data);
 
-  result = ma_decoder_init_file(filePath, NULL, &decoder);
+  ma_result result;
+  ma_engine engine;
+
+  result = ma_engine_init(NULL, &engine);
   if (result != MA_SUCCESS) {
-    fprintf(stderr, "Could not load file %s\n", filePath);
-    return NULL;
+    printf("Failed to initialize audio engine.");
+    exit(1);
   }
-  deviceConfig = ma_device_config_init(ma_device_type_playback);
-  deviceConfig.playback.format = decoder.outputFormat;
-  deviceConfig.playback.channels = decoder.outputChannels;
-  deviceConfig.sampleRate = decoder.outputSampleRate;
-  deviceConfig.dataCallback = data_callback;
-  deviceConfig.pUserData = &decoder;
-  if (ma_device_init(NULL, &deviceConfig, &device) != MA_SUCCESS) {
-    fprintf(stderr, "Failed to initialise audio device\n");
-    ma_decoder_uninit(&decoder);
-    return NULL;
+
+  ma_sound sound;
+  result = ma_sound_init_from_file(&engine, filePath, 0, NULL, NULL, &sound);
+  if (result != MA_SUCCESS) {
+    printf("Failed to load sound file.");
+    exit(1);
   }
-  if (ma_device_start(&device) != MA_SUCCESS) {
-    fprintf(stderr, "Failed to start audio device\n");
-    ma_decoder_uninit(&decoder);
-    ma_device_uninit(&device);
-    return NULL;
+
+  ma_sound_start(&sound);
+  while (ma_sound_at_end(&sound) == 0) {
+    sleep(1);
   }
-  ma_device_uninit(&device);
-  ma_decoder_uninit(&decoder);
+
+  ma_sound_stop(&sound);
+  ma_engine_uninit(&engine);
   return NULL;
 }
 
 int tPlayAudio(char filePath[]) {
-  pthread_t thread;
   char *dupedFilePath = malloc(strlen(filePath) + 1);
   if (dupedFilePath == NULL) {
     abort();
   }
+
   strcpy(dupedFilePath, filePath);
+
+  pthread_t thread;
   pthread_create(&thread, NULL, play_audio, dupedFilePath);
+  pthread_detach(thread);
   return 0;
 }
 
