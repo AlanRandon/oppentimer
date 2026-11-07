@@ -2,10 +2,6 @@
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
 
-void hello_from_c() {
-    printf("Hello from C!\n");
-}
-
 void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount)
 {
     ma_decoder* pDecoder = (ma_decoder*)pDevice->pUserData;
@@ -26,7 +22,7 @@ int play_audio(char filePath[]) {
 
     result = ma_decoder_init_file(filePath, NULL, &decoder);
     if (result != MA_SUCCESS) {
-        printf("Could not load file %d\n", filePath);
+        printf("Could not load file %s\n", filePath);
         return -1;
     }
     deviceConfig = ma_device_config_init(ma_device_type_playback);
