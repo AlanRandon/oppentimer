@@ -6,15 +6,14 @@
 
 module Oppentimer (oppentimerMain) where
 
-import Apecs
+import Apecs hiding (Set)
 import Apecs.Gloss
-import Data.Maybe (fromMaybe)
+import Data.Set (Set, fromList, member, singleton)
+import Graphics.Gloss (BitmapData (bitmapSize))
 import Graphics.Gloss.Juicy (loadJuicyPNG)
+import System.Exit (exitSuccess)
 
 -- import Oppentimer.Clock (Clock)
-
-import Control.Monad (join)
-import System.Exit (exitSuccess)
 
 -------------------------------------------
 -- Components
@@ -40,6 +39,12 @@ instance Component Collidable where type Storage Collidable = Map Collidable
 data Harry = Harry
 instance Component Harry where type Storage Harry = Map Harry
 
+data Scene = Battle | Death deriving (Eq, Ord)
+instance Component Scene where type Storage Scene = Map Scene
+
+data VisibleInScenes = VisibleInScenes (Set Scene)
+instance Component VisibleInScenes where type Storage VisibleInScenes = Map VisibleInScenes
+
 newtype Texture = Texture Picture
 instance Component Texture where type Storage Texture = Map Texture
 
@@ -57,6 +62,8 @@ makeWorld
         , ''Wall
         , ''Harry
         , ''Collidable
+        , ''Scene
+        , ''VisibleInScenes
         -- , ''Clock
         ]
 
@@ -68,9 +75,14 @@ type System' a = System Model a
 
 view :: System' Picture
 view =
-        foldDraw -- cram everything into one picture
-                ( \(Pos x y, Texture bmp) ->
-                        translate x y $ bmp
+        foldDrawM
+                ( \(scene :: Scene) ->
+                        foldDraw -- cram everything into one picture
+                                ( \(Pos x y, Texture bmp, VisibleInScenes entityScene) ->
+                                        if scene `member` entityScene
+                                                then translate x y $ bmp
+                                                else Blank
+                                )
                 )
 
 viewHitboxes :: System' Picture
@@ -94,7 +106,7 @@ inputController event = case event of
         EventKey (Char 'j') Down _ _ -> cmap (const DirectionDown :: Direction -> Direction)
         EventKey (Char 'k') Down _ _ -> cmap (const DirectionUp :: Direction -> Direction)
         EventKey (Char 'l') Down _ _ -> cmap (const DirectionRight :: Direction -> Direction)
-        EventKey (Char '`') Down _ _ -> cmap (const DirectionStationary :: Direction -> Direction)
+        EventKey (Char '`') Down _ _ -> cmap (const Death :: Scene -> Scene)
         _ -> pure ()
 
 stepPos :: Float -> System' ()
@@ -119,7 +131,7 @@ stepCollisionBox =
 stepVel :: System' ()
 stepVel =
         cmap
-                ( \(d, Vel vX vY) -> case d of
+                ( \(d, Vel _ _) -> case d of
                         DirectionLeft -> Vel (-velocity) 0
                         DirectionRight -> Vel velocity 0
                         DirectionUp -> Vel 0 velocity
@@ -166,12 +178,29 @@ collidesWith
 
 createEntities :: System' ()
 createEntities = do
-        harryBmp <- (fromMaybe (error "failed to load")) <$> (liftIO $ loadJuicyPNG "assets/characters/harry.png")
+        -- load sprites
+        harryBmp <-
+                ( \bmp -> case bmp of
+                        Just (Bitmap bmp') -> bmp'
+                        _ -> (error "failed to load")
+                )
+                        <$> (liftIO $ loadJuicyPNG "assets/characters/harry.png")
+        let harryWidth = 20 :: Float
+        let harryScale = harryWidth / fromIntegral (fst $ bitmapSize harryBmp)
+        let harryHeight = harryScale * (fromIntegral . snd $ bitmapSize harryBmp)
+        let harryBmp' = scale harryScale harryScale $ bitmap harryBmp
 
+        -- set the scene
+        newEntity_ Battle
+
+        ---------------------------------------
+        ---          battle scene           ---
+        ---------------------------------------
         -- arena sprite
         newEntity_
                 ( Pos arenaX arenaY
                 , Texture (color white $ rectangleWire arenaWidth arenaHeight)
+                , VisibleInScenes (singleton Battle)
                 )
 
         -- arena walls
@@ -179,21 +208,28 @@ createEntities = do
                 ( Pos (arenaX) (arenaY + (arenaHeight / 2))
                 , Wall
                 , Collidable (Pos (arenaX) (arenaY + (arenaHeight / 2))) (Size arenaWidth 10)
+                , VisibleInScenes (singleton Battle)
                 )
+
         newEntity_ -- east wall
                 ( Pos (arenaX - (arenaWidth / 2)) (arenaY)
                 , Wall
                 , Collidable (Pos (arenaX - (arenaWidth / 2)) (arenaY)) (Size 10 arenaHeight)
+                , VisibleInScenes (singleton Battle)
                 )
+
         newEntity_ -- west wall
                 ( Pos (arenaX + (arenaWidth / 2)) (arenaY)
                 , Wall
                 , Collidable (Pos (arenaX + (arenaWidth / 2)) (arenaY)) (Size 10 arenaHeight)
+                , VisibleInScenes (singleton Battle)
                 )
+
         newEntity_ -- south wall
                 ( Pos (arenaX) (arenaY - (arenaHeight / 2))
                 , Wall
                 , Collidable (Pos (arenaX) (arenaY - (arenaHeight / 2))) (Size arenaWidth 10)
+                , VisibleInScenes (singleton Battle)
                 )
 
         -- harry
@@ -201,15 +237,26 @@ createEntities = do
                 ( Pos 0 0
                 , Harry
                 , Vel 0 0
-                , Texture (scale 0.1 0.1 harryBmp)
+                , Texture harryBmp'
                 , DirectionStationary
-                , Collidable (Pos (-10) (-10)) (Size 20 20)
+                , Collidable (Pos (0) (0)) (Size harryWidth harryHeight)
+                , VisibleInScenes (singleton Battle)
                 )
 
         -- oppentimer
+        -- newEntity_
+        --        ( Pos 0 0
+        --        , Texture (translate 100 100 $ scale 0.1 0.1 $ color white $ text "4:59")
+        -- 	,
+        --        )
+        ---------------------------------------
+        ---          death scene            ---
+        ---------------------------------------
+        -- death scene text
         newEntity_
                 ( Pos 0 0
-                , Texture (color white $ text "4:59")
+                , Texture (translate 100 100 $ scale 0.1 0.1 $ color white $ text "You are dead")
+                , VisibleInScenes (singleton Death)
                 )
     where
         arenaWidth = 400
