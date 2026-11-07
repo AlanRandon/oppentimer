@@ -26,11 +26,10 @@ void data_callback(ma_device *pDevice, void *pOutput, const void *pInput,
   (void)pInput;
 }
 
-void *play_audio(void *data) {
+void *playAudio(void *data) {
   char filePath[1024] = {0};
   snprintf(filePath, sizeof(filePath), "%s", (char *)data);
-  // TODO: fix leak
-  // free(data);
+  free(data);
 
   ma_result result;
   ma_engine engine;
@@ -67,7 +66,7 @@ int tPlayAudio(char filePath[]) {
   strcpy(dupedFilePath, filePath);
 
   pthread_t thread;
-  pthread_create(&thread, NULL, play_audio, dupedFilePath);
+  pthread_create(&thread, NULL, playAudio, dupedFilePath);
   pthread_detach(thread);
   return 0;
 }
