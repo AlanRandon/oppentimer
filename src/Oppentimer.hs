@@ -19,6 +19,8 @@ import System.Exit (exitSuccess)
 -- Components
 -------------------------------------------
 
+data SpriteData = SpriteData Size Texture
+
 data Pos = Pos Float Float
 instance Component Pos where type Storage Pos = Map Pos
 
@@ -39,7 +41,7 @@ instance Component Collidable where type Storage Collidable = Map Collidable
 data Harry = Harry
 instance Component Harry where type Storage Harry = Map Harry
 
-data Scene = Battle | Death deriving (Eq, Ord)
+data Scene = BattleDan | Death deriving (Eq, Ord)
 instance Component Scene where type Storage Scene = Map Scene
 
 data VisibleInScenes = VisibleInScenes (Set Scene)
@@ -107,6 +109,7 @@ inputController event = case event of
         EventKey (Char 'k') Down _ _ -> cmap (const DirectionUp :: Direction -> Direction)
         EventKey (Char 'l') Down _ _ -> cmap (const DirectionRight :: Direction -> Direction)
         EventKey (Char '`') Down _ _ -> cmap (const Death :: Scene -> Scene)
+        EventKey (Char _) Up _ _ -> cmap (const DirectionStationary :: Direction -> Direction)
         _ -> pure ()
 
 stepPos :: Float -> System' ()
@@ -176,22 +179,28 @@ collidesWith
 -- Spawn entities
 -------------------------------------------
 
-createEntities :: System' ()
-createEntities = do
-        -- load sprites
+-- createBattleSceneEntities :: System' ()
+-- createBattleSceneEntities  = do
+
+loadSprite :: String -> IO SpriteData
+loadSprite path = do
         harryBmp <-
                 ( \bmp -> case bmp of
                         Just (Bitmap bmp') -> bmp'
                         _ -> (error "failed to load")
                 )
-                        <$> (liftIO $ loadJuicyPNG "assets/characters/harry.png")
+                        <$> (loadJuicyPNG path)
         let harryWidth = 20 :: Float
         let harryScale = harryWidth / fromIntegral (fst $ bitmapSize harryBmp)
         let harryHeight = harryScale * (fromIntegral . snd $ bitmapSize harryBmp)
         let harryBmp' = scale harryScale harryScale $ bitmap harryBmp
 
+        pure $ SpriteData (Size harryWidth harryHeight) (Texture harryBmp')
+
+createEntities :: System' ()
+createEntities = do
         -- set the scene
-        newEntity_ Battle
+        newEntity_ BattleDan
 
         ---------------------------------------
         ---          battle scene           ---
@@ -200,47 +209,48 @@ createEntities = do
         newEntity_
                 ( Pos arenaX arenaY
                 , Texture (color white $ rectangleWire arenaWidth arenaHeight)
-                , VisibleInScenes (singleton Battle)
+                , VisibleInScenes (singleton BattleDan)
                 )
 
         -- arena walls
         newEntity_ -- north wall
                 ( Pos (arenaX) (arenaY + (arenaHeight / 2))
                 , Wall
-                , Collidable (Pos (arenaX) (arenaY + (arenaHeight / 2))) (Size arenaWidth 10)
-                , VisibleInScenes (singleton Battle)
+                , Collidable (Pos (arenaX) (arenaY + (arenaHeight / 2))) (Size arenaWidth 0)
+                , VisibleInScenes (singleton BattleDan)
                 )
 
         newEntity_ -- east wall
                 ( Pos (arenaX - (arenaWidth / 2)) (arenaY)
                 , Wall
-                , Collidable (Pos (arenaX - (arenaWidth / 2)) (arenaY)) (Size 10 arenaHeight)
-                , VisibleInScenes (singleton Battle)
+                , Collidable (Pos (arenaX - (arenaWidth / 2)) (arenaY)) (Size 0 arenaHeight)
+                , VisibleInScenes (singleton BattleDan)
                 )
 
         newEntity_ -- west wall
                 ( Pos (arenaX + (arenaWidth / 2)) (arenaY)
                 , Wall
-                , Collidable (Pos (arenaX + (arenaWidth / 2)) (arenaY)) (Size 10 arenaHeight)
-                , VisibleInScenes (singleton Battle)
+                , Collidable (Pos (arenaX + (arenaWidth / 2)) (arenaY)) (Size 0 arenaHeight)
+                , VisibleInScenes (singleton BattleDan)
                 )
 
         newEntity_ -- south wall
                 ( Pos (arenaX) (arenaY - (arenaHeight / 2))
                 , Wall
-                , Collidable (Pos (arenaX) (arenaY - (arenaHeight / 2))) (Size arenaWidth 10)
-                , VisibleInScenes (singleton Battle)
+                , Collidable (Pos (arenaX) (arenaY - (arenaHeight / 2))) (Size arenaWidth 0)
+                , VisibleInScenes (singleton BattleDan)
                 )
 
         -- harry
+        SpriteData (Size harryWidth harryHeight) (Texture harryBmp) <- liftIO $ loadSprite "assets/characters/harry.png"
         newEntity_
-                ( Pos 0 0
+                ( Pos (arenaX) (arenaY)
                 , Harry
                 , Vel 0 0
-                , Texture harryBmp'
+                , Texture harryBmp
                 , DirectionStationary
-                , Collidable (Pos (0) (0)) (Size harryWidth harryHeight)
-                , VisibleInScenes (singleton Battle)
+                , Collidable (Pos arenaX arenaY) (Size harryWidth harryHeight)
+                , VisibleInScenes (singleton BattleDan)
                 )
 
         -- oppentimer
@@ -259,10 +269,10 @@ createEntities = do
                 , VisibleInScenes (singleton Death)
                 )
     where
-        arenaWidth = 400
-        arenaHeight = 200
+        arenaWidth = 200
+        arenaHeight = 100
         arenaX = 0
-        arenaY = 0
+        arenaY = -100
 
 -------------------------------------------
 -- Run game

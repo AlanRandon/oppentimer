@@ -1,7 +1,7 @@
 - BASICS 
     - [x] player movement
     - [ ] player (health, damage)
-    - [ ] player collisions
+    - [x] player collisions
 - BATTLE SYSTEM
     - [ ] battle UI
     - [ ] bullet spawning
