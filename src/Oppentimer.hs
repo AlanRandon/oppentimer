@@ -6,16 +6,20 @@
 
 module Oppentimer (oppentimerMain) where
 
-import Apecs
+import Apecs hiding (Set)
 import Apecs.Gloss
-import Data.Maybe (fromMaybe)
+import Data.Set (Set, fromList, member, singleton)
+import Graphics.Gloss (BitmapData (bitmapSize))
 import Graphics.Gloss.Juicy (loadJuicyPNG)
-import Oppentimer.Clock (Clock)
 import System.Exit (exitSuccess)
+
+-- import Oppentimer.Clock (Clock)
 
 -------------------------------------------
 -- Components
 -------------------------------------------
+
+data SpriteData = SpriteData Size Texture
 
 data Pos = Pos Float Float
 instance Component Pos where type Storage Pos = Map Pos
@@ -37,6 +41,12 @@ instance Component Collidable where type Storage Collidable = Map Collidable
 data Harry = Harry
 instance Component Harry where type Storage Harry = Map Harry
 
+data Scene = BattleDan | Death deriving (Eq, Ord)
+instance Component Scene where type Storage Scene = Map Scene
+
+data VisibleInScenes = VisibleInScenes (Set Scene)
+instance Component VisibleInScenes where type Storage VisibleInScenes = Map VisibleInScenes
+
 newtype Texture = Texture Picture
 instance Component Texture where type Storage Texture = Map Texture
 
@@ -54,7 +64,9 @@ makeWorld
         , ''Wall
         , ''Harry
         , ''Collidable
-        , ''Clock
+        , ''Scene
+        , ''VisibleInScenes
+        -- , ''Clock
         ]
 
 type System' a = System Model a
@@ -65,9 +77,14 @@ type System' a = System Model a
 
 view :: System' Picture
 view =
-        foldDraw -- cram everything into one picture
-                ( \(Pos x y, Texture bmp) ->
-                        translate x y $ bmp
+        foldDrawM
+                ( \(scene :: Scene) ->
+                        foldDraw -- cram everything into one picture
+                                ( \(Pos x y, Texture bmp, VisibleInScenes entityScene) ->
+                                        if scene `member` entityScene
+                                                then translate x y $ bmp
+                                                else Blank
+                                )
                 )
 
 viewHitboxes :: System' Picture
@@ -91,7 +108,8 @@ inputController event = case event of
         EventKey (Char 'j') Down _ _ -> cmap (const DirectionDown :: Direction -> Direction)
         EventKey (Char 'k') Down _ _ -> cmap (const DirectionUp :: Direction -> Direction)
         EventKey (Char 'l') Down _ _ -> cmap (const DirectionRight :: Direction -> Direction)
-        EventKey (Char '`') Down _ _ -> cmap (const DirectionStationary :: Direction -> Direction)
+        EventKey (Char '`') Down _ _ -> cmap (const Death :: Scene -> Scene)
+        EventKey (Char _) Up _ _ -> cmap (const DirectionStationary :: Direction -> Direction)
         _ -> pure ()
 
 stepPos :: Float -> System' ()
@@ -101,7 +119,7 @@ stepPos dt =
                         let newPos = Pos (x + vX * dt) (y + vY * dt)
                         let newHarryBox = Collidable newPos harrySize
                         isCollision <- cfold (\acc (box :: Collidable, id' :: Entity) -> acc || (id' /= harryId && collidesWith newHarryBox box)) False
-                        if not isCollision
+                        if isCollision
                                 then pure (Pos x y, Vel 0 0)
                                 else pure (newPos, Vel vX vY)
                 )
@@ -116,11 +134,11 @@ stepCollisionBox =
 stepVel :: System' ()
 stepVel =
         cmap
-                ( \(d, Vel vX vY) -> case d of
-                        DirectionLeft -> Vel (-velocity) vY
-                        DirectionRight -> Vel velocity vY
-                        DirectionUp -> Vel vX velocity
-                        DirectionDown -> Vel vX (-velocity)
+                ( \(d, Vel _ _) -> case d of
+                        DirectionLeft -> Vel (-velocity) 0
+                        DirectionRight -> Vel velocity 0
+                        DirectionUp -> Vel 0 velocity
+                        DirectionDown -> Vel 0 (-velocity)
                         DirectionStationary -> Vel 0 0
                 )
     where
@@ -161,33 +179,100 @@ collidesWith
 -- Spawn entities
 -------------------------------------------
 
+-- createBattleSceneEntities :: System' ()
+-- createBattleSceneEntities  = do
+
+loadSprite :: String -> IO SpriteData
+loadSprite path = do
+        harryBmp <-
+                ( \bmp -> case bmp of
+                        Just (Bitmap bmp') -> bmp'
+                        _ -> (error "failed to load")
+                )
+                        <$> (loadJuicyPNG path)
+        let harryWidth = 20 :: Float
+        let harryScale = harryWidth / fromIntegral (fst $ bitmapSize harryBmp)
+        let harryHeight = harryScale * (fromIntegral . snd $ bitmapSize harryBmp)
+        let harryBmp' = scale harryScale harryScale $ bitmap harryBmp
+
+        pure $ SpriteData (Size harryWidth harryHeight) (Texture harryBmp')
+
 createEntities :: System' ()
 createEntities = do
-        harryBmp <- (fromMaybe (error "failed to load")) <$> (liftIO $ loadJuicyPNG "assets/characters/harry.png")
+        -- set the scene
+        newEntity_ BattleDan
 
+        ---------------------------------------
+        ---          battle scene           ---
+        ---------------------------------------
+        -- arena sprite
         newEntity_
-                ( Pos 0 0
-                , Wall
-                , Texture (color white $ lineLoop $ rectanglePath arenaWidth arenaHeight)
-                , Collidable (Pos 0 0) (Size arenaWidth arenaHeight)
+                ( Pos arenaX arenaY
+                , Texture (color white $ rectangleWire arenaWidth arenaHeight)
+                , VisibleInScenes (singleton BattleDan)
                 )
 
+        -- arena walls
+        newEntity_ -- north wall
+                ( Pos (arenaX) (arenaY + (arenaHeight / 2))
+                , Wall
+                , Collidable (Pos (arenaX) (arenaY + (arenaHeight / 2))) (Size arenaWidth 0)
+                , VisibleInScenes (singleton BattleDan)
+                )
+
+        newEntity_ -- east wall
+                ( Pos (arenaX - (arenaWidth / 2)) (arenaY)
+                , Wall
+                , Collidable (Pos (arenaX - (arenaWidth / 2)) (arenaY)) (Size 0 arenaHeight)
+                , VisibleInScenes (singleton BattleDan)
+                )
+
+        newEntity_ -- west wall
+                ( Pos (arenaX + (arenaWidth / 2)) (arenaY)
+                , Wall
+                , Collidable (Pos (arenaX + (arenaWidth / 2)) (arenaY)) (Size 0 arenaHeight)
+                , VisibleInScenes (singleton BattleDan)
+                )
+
+        newEntity_ -- south wall
+                ( Pos (arenaX) (arenaY - (arenaHeight / 2))
+                , Wall
+                , Collidable (Pos (arenaX) (arenaY - (arenaHeight / 2))) (Size arenaWidth 0)
+                , VisibleInScenes (singleton BattleDan)
+                )
+
+        -- harry
+        SpriteData (Size harryWidth harryHeight) (Texture harryBmp) <- liftIO $ loadSprite "assets/characters/harry.png"
         newEntity_
-                ( Pos 0 0
+                ( Pos (arenaX) (arenaY)
                 , Harry
                 , Vel 0 0
-                , Texture (scale 0.1 0.1 harryBmp)
+                , Texture harryBmp
                 , DirectionStationary
-                , Collidable (Pos (-10) (-10)) (Size 20 20)
+                , Collidable (Pos arenaX arenaY) (Size harryWidth harryHeight)
+                , VisibleInScenes (singleton BattleDan)
                 )
 
+        -- oppentimer
+        -- newEntity_
+        --        ( Pos 0 0
+        --        , Texture (translate 100 100 $ scale 0.1 0.1 $ color white $ text "4:59")
+        -- 	,
+        --        )
+        ---------------------------------------
+        ---          death scene            ---
+        ---------------------------------------
+        -- death scene text
         newEntity_
                 ( Pos 0 0
-                , Texture (color white $ text "4:59")
+                , Texture (translate 100 100 $ scale 0.1 0.1 $ color white $ text "You are dead")
+                , VisibleInScenes (singleton Death)
                 )
     where
-        arenaWidth = 400
-        arenaHeight = 200
+        arenaWidth = 200
+        arenaHeight = 100
+        arenaX = 0
+        arenaY = -100
 
 -------------------------------------------
 -- Run game
@@ -200,7 +285,7 @@ game = do
         play
                 display
                 black
-                60 -- FPS
+                60 -- fps
                 ( do
                         p1 <- view
                         p2 <- viewHitboxes
