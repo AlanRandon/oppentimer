@@ -14,6 +14,7 @@ executable example
     other-modules:
         Oppentimer
         Oppentimer.Timer
+        Oppentimer.Audio
         -- Cutscene
     build-depends:
         apecs,
@@ -25,3 +26,5 @@ executable example
         GLUT
     hs-source-dirs:   src
     default-language: Haskell2010
+    c-sources: src/AUDIO_FFI_STUFF/audio.c
+    cc-options: -std=c11 -Wnopedantic

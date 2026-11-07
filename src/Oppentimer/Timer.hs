@@ -27,11 +27,6 @@ instance Show Timer where
 textWidth :: String -> IO GLint
 textWidth = Fonts.stringWidth Fonts.Roman
 
--- centeredText str = do
---         GL.blend $= GL.Disabled
---         GL.preservingMatrix $ GLUT.renderString GLUT.Roman str
---         GL.blend $= GL.Enabled
-
 newTimer :: Float -> Timer
 newTimer = Running . TimeSeconds
 

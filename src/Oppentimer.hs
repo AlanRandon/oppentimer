@@ -12,6 +12,7 @@ import qualified Data.Map as M
 import Data.Set (Set, fromList, member, singleton)
 import Graphics.Gloss (BitmapData (bitmapSize))
 import Graphics.Gloss.Juicy (loadJuicyPNG)
+import Oppentimer.Audio (haskellPlayAudio)
 import Oppentimer.Timer (Timer, isExpired, newTimer, tickTimer, viewTimer)
 import System.Exit (exitSuccess)
 
@@ -350,4 +351,5 @@ game = do
 oppentimerMain :: IO ()
 oppentimerMain = do
         w <- initModel
+	audioResult <- haskellPlayAudio "src/AUDIO_FFI_STUFF/foxy-scream-fnaf-1.mp3"
         runWith w game

@@ -24,6 +24,10 @@
 
             devShell = {
               mkShellArgs = {
+                nativeBuildInputs = with pkgs; [
+                  miniaudio.dev
+                ];
+
                 buildInputs = with pkgs; [
                   miniaudio
                 ];
