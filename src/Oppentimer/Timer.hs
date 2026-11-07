@@ -4,7 +4,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module Oppentimer.Timer (Timer (Ended), tickTimer, viewTimer, newTimer) where
+module Oppentimer.Timer (Timer, tickTimer, viewTimer, newTimer, isExpired) where
 
 import Apecs
 import Apecs.Gloss
@@ -36,8 +36,13 @@ newTimer :: Float -> Timer
 newTimer = Running . TimeSeconds
 
 tickTimer :: Float -> Timer -> Timer
-tickTimer dt (Running (TimeSeconds n)) = Running $ TimeSeconds (n - dt)
 tickTimer _ Ended = Ended
+tickTimer dt (Running (TimeSeconds n)) =
+        if newTime > 0
+                then Running $ TimeSeconds newTime
+                else Ended
+    where
+        newTime = (n - dt)
 
 viewTimer :: Timer -> IO Picture
 viewTimer timer = do
@@ -45,3 +50,7 @@ viewTimer timer = do
         fontWidth <- textWidth text'
         let renderedText = text text'
         pure $ scale 0.1 0.1 $ translate (-fromIntegral fontWidth / 2) 0 $ renderedText
+
+isExpired :: Timer -> Bool
+isExpired Ended = True
+isExpired _ = False

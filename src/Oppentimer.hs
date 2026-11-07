@@ -12,7 +12,7 @@ import qualified Data.Map as M
 import Data.Set (Set, fromList, member, singleton)
 import Graphics.Gloss (BitmapData (bitmapSize))
 import Graphics.Gloss.Juicy (loadJuicyPNG)
-import Oppentimer.Timer (Timer, newTimer, tickTimer, viewTimer)
+import Oppentimer.Timer (Timer, isExpired, newTimer, tickTimer, viewTimer)
 import System.Exit (exitSuccess)
 
 -------------------------------------------
@@ -160,10 +160,14 @@ stepVel =
     where
         velocity = 50
 
--- stepCheckWin :: System' ()
--- stepCheckWin =
---         cmapM
---                 (\Ended -> cmapM (\(_ :: Scene) -> Win))
+stepCheckWin :: System' ()
+stepCheckWin =
+        cmapM
+                ( \(timer :: Timer) ->
+                        if isExpired timer
+                                then cmapM (\(_ :: Scene) -> pure Win)
+                                else pure ()
+                )
 
 collidesWith :: Collidable -> Collidable -> Bool
 collidesWith
@@ -276,7 +280,7 @@ createEntities = do
         -- oppentimer
         newEntity_
                 ( Pos 0 0
-                , newTimer 300.0
+                , newTimer 10.0
                 , VisibleInScenes (singleton BattleOppenheimer)
                 )
 
@@ -317,6 +321,7 @@ game = do
                 ( \dt -> do
                         stepPos dt
                         stepVel
+                        stepCheckWin
                         stepCollisionBox
                         cmap (tickTimer dt)
                 )
