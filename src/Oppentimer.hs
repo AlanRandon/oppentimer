@@ -12,9 +12,8 @@ import qualified Data.Map as M
 import Data.Set (Set, fromList, member, singleton)
 import Graphics.Gloss (BitmapData (bitmapSize))
 import Graphics.Gloss.Juicy (loadJuicyPNG)
-import System.Exit (exitSuccess)
-
 import Oppentimer.Timer (Timer, newTimer, tickTimer, viewTimer)
+import System.Exit (exitSuccess)
 
 -------------------------------------------
 -- Components
@@ -42,7 +41,7 @@ instance Component Collidable where type Storage Collidable = Map Collidable
 data Harry = Harry
 instance Component Harry where type Storage Harry = Map Harry
 
-data Scene = BattleDan | Death deriving (Eq, Ord)
+data Scene = BattleOppenheimer | Death | Win deriving (Eq, Ord)
 instance Component Scene where type Storage Scene = Map Scene
 
 data VisibleInScenes = VisibleInScenes (Set Scene)
@@ -161,13 +160,10 @@ stepVel =
     where
         velocity = 50
 
--- checkArenaCollision :: Float -> System' ()
--- checkArenaCollision dt =
---        cmapM_
---                ( \(Harry, harryId :: Entity) -> do
--- 			collides <- collect (\(c :: Collidable, id :: Entity) -> if id /= harryId && collidesWith  then)
---                        pure ()
---                )
+-- stepCheckWin :: System' ()
+-- stepCheckWin =
+--         cmapM
+--                 (\Ended -> cmapM (\(_ :: Scene) -> Win))
 
 collidesWith :: Collidable -> Collidable -> Bool
 collidesWith
@@ -199,34 +195,41 @@ collidesWith
 -- createBattleSceneEntities :: System' ()
 -- createBattleSceneEntities  = do
 
-loadSprite :: String -> IO SpriteData
-loadSprite path = do
-        harryBmp <-
+loadSprite :: Float -> String -> IO SpriteData
+loadSprite scale' path = do
+        imageBmp <-
                 ( \bmp -> case bmp of
                         Just (Bitmap bmp') -> bmp'
                         _ -> (error "failed to load")
                 )
                         <$> (loadJuicyPNG path)
-        let harryWidth = 20 :: Float
-        let harryScale = harryWidth / fromIntegral (fst $ bitmapSize harryBmp)
-        let harryHeight = harryScale * (fromIntegral . snd $ bitmapSize harryBmp)
-        let harryBmp' = scale harryScale harryScale $ bitmap harryBmp
+        let imageWidth = scale'
+        let imageScale = imageWidth / (fromIntegral (fst $ bitmapSize imageBmp) :: Float)
+        let imageHeight = imageScale * (fromIntegral . snd $ bitmapSize imageBmp)
+        let imageBmp' = scale imageScale imageScale $ bitmap imageBmp
 
-        pure $ SpriteData (Size harryWidth harryHeight) (Texture harryBmp')
+        pure $ SpriteData (Size imageWidth imageHeight) (Texture imageBmp')
 
 createEntities :: System' ()
 createEntities = do
         -- set the scene
-        newEntity_ BattleDan
+        newEntity_ BattleOppenheimer
 
         ---------------------------------------
         ---          battle scene           ---
         ---------------------------------------
+        -- dan
+        SpriteData (Size oppenheimerWidth oppenheimerHeight) (Texture oppenheimerBmp) <- liftIO $ loadSprite 250 "assets/characters/oppenheimer.png"
+        newEntity_
+                ( Pos 0 70
+                , VisibleInScenes (singleton BattleOppenheimer)
+                , Texture oppenheimerBmp
+                )
         -- arena sprite
         newEntity_
                 ( Pos arenaX arenaY
                 , Texture (color white $ rectangleWire arenaWidth arenaHeight)
-                , VisibleInScenes (singleton BattleDan)
+                , VisibleInScenes (singleton BattleOppenheimer)
                 )
 
         -- arena walls
@@ -234,32 +237,32 @@ createEntities = do
                 ( Pos (arenaX) (arenaY + (arenaHeight / 2))
                 , Wall
                 , Collidable (Pos (arenaX) (arenaY + (arenaHeight / 2))) (Size arenaWidth 0)
-                , VisibleInScenes (singleton BattleDan)
+                , VisibleInScenes (singleton BattleOppenheimer)
                 )
 
         newEntity_ -- east wall
                 ( Pos (arenaX - (arenaWidth / 2)) (arenaY)
                 , Wall
                 , Collidable (Pos (arenaX - (arenaWidth / 2)) (arenaY)) (Size 0 arenaHeight)
-                , VisibleInScenes (singleton BattleDan)
+                , VisibleInScenes (singleton BattleOppenheimer)
                 )
 
         newEntity_ -- west wall
                 ( Pos (arenaX + (arenaWidth / 2)) (arenaY)
                 , Wall
                 , Collidable (Pos (arenaX + (arenaWidth / 2)) (arenaY)) (Size 0 arenaHeight)
-                , VisibleInScenes (singleton BattleDan)
+                , VisibleInScenes (singleton BattleOppenheimer)
                 )
 
         newEntity_ -- south wall
                 ( Pos (arenaX) (arenaY - (arenaHeight / 2))
                 , Wall
                 , Collidable (Pos (arenaX) (arenaY - (arenaHeight / 2))) (Size arenaWidth 0)
-                , VisibleInScenes (singleton BattleDan)
+                , VisibleInScenes (singleton BattleOppenheimer)
                 )
 
         -- harry
-        SpriteData (Size harryWidth harryHeight) (Texture harryBmp) <- liftIO $ loadSprite "assets/characters/harry.png"
+        SpriteData (Size harryWidth harryHeight) (Texture harryBmp) <- liftIO $ loadSprite 20 "assets/characters/harry.png"
         newEntity_
                 ( Pos (arenaX) (arenaY)
                 , Harry
@@ -267,14 +270,14 @@ createEntities = do
                 , Texture harryBmp
                 , DirectionStationary
                 , Collidable (Pos arenaX arenaY) (Size harryWidth harryHeight)
-                , VisibleInScenes (singleton BattleDan)
+                , VisibleInScenes (singleton BattleOppenheimer)
                 )
 
         -- oppentimer
         newEntity_
                 ( Pos 0 0
                 , newTimer 300.0
-                , VisibleInScenes (singleton BattleDan)
+                , VisibleInScenes (singleton BattleOppenheimer)
                 )
 
         ---------------------------------------
@@ -287,10 +290,10 @@ createEntities = do
                 , VisibleInScenes (singleton Death)
                 )
     where
-        arenaWidth = 200
-        arenaHeight = 100
+        arenaWidth = 300
+        arenaHeight = 150
         arenaX = 0
-        arenaY = -100
+        arenaY = -80
 
 -------------------------------------------
 -- Run game
@@ -306,9 +309,9 @@ game = do
                 60 -- fps
                 ( do
                         p1 <- view
-                        p2 <- viewHitboxes
-                        p3 <- foldDraw viewTimer
-                        pure $ pictures [p1, p2, p3]
+                        -- p2 <- viewHitboxes
+                        p3 <- foldDrawM (\timer -> liftIO $ fmap (translate 0 150 . color white) $ viewTimer timer)
+                        pure $ pictures [p1, p3]
                 )
                 inputController
                 ( \dt -> do
