@@ -8,7 +8,8 @@ module Oppentimer (oppentimerMain) where
 
 import Apecs hiding (Set)
 import Apecs.Gloss
-import Data.Set (Set, member, singleton)
+import qualified Data.Map as M
+import Data.Set (Set, fromList, member, singleton)
 import Graphics.Gloss (BitmapData (bitmapSize))
 import Graphics.Gloss.Juicy (loadJuicyPNG)
 import System.Exit (exitSuccess)
@@ -99,16 +100,32 @@ viewHitboxes =
 -- Controller
 -------------------------------------------
 
+directionBinds :: M.Map Key Direction
+directionBinds =
+        M.fromList
+                [ (Char 'h', DirectionLeft)
+                , (Char 'a', DirectionLeft)
+                , (SpecialKey KeyLeft, DirectionLeft)
+                , (Char 'k', DirectionUp)
+                , (Char 'w', DirectionUp)
+                , (SpecialKey KeyUp, DirectionUp)
+                , (Char 'j', DirectionDown)
+                , (Char 's', DirectionDown)
+                , (SpecialKey KeyDown, DirectionDown)
+                , (Char 'l', DirectionRight)
+                , (Char 'd', DirectionRight)
+                , (SpecialKey KeyRight, DirectionRight)
+                ]
+
 inputController :: Event -> System' ()
 inputController event = case event of
         EventKey (SpecialKey KeyEsc) Down _ _ ->
                 liftIO exitSuccess
         EventKey (Char 'q') Down _ _ -> liftIO exitSuccess
-        EventKey (Char 'h') Down _ _ -> cmap (const DirectionLeft :: Direction -> Direction)
-        EventKey (Char 'j') Down _ _ -> cmap (const DirectionDown :: Direction -> Direction)
-        EventKey (Char 'k') Down _ _ -> cmap (const DirectionUp :: Direction -> Direction)
-        EventKey (Char 'l') Down _ _ -> cmap (const DirectionRight :: Direction -> Direction)
         EventKey (Char '`') Down _ _ -> cmap (const Death :: Scene -> Scene)
+        EventKey (k) Down _ _ -> case k `M.lookup` directionBinds of
+                Just bind -> cmap (const bind :: Direction -> Direction)
+                Nothing -> pure ()
         EventKey (Char _) Up _ _ -> cmap (const DirectionStationary :: Direction -> Direction)
         _ -> pure ()
 
