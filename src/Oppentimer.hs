@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -57,8 +56,8 @@ instance Component Texture where type Storage Texture = Map Texture
 makeWorld
         "Model"
         [ ''Camera
-        , ''Pos
-        , ''Vel
+        , ''Position
+        , ''Velocity
         , ''Direction
         , ''Texture
         , ''Wall
@@ -85,14 +84,6 @@ view =
                                                 then translate x y $ bmp
                                                 else Blank
                                 )
-                )
-
-viewHitboxes :: System' Picture
-viewHitboxes =
-        foldDraw -- hitboxes and stuff
-                ( \(Collidable (Pos x y) (Size w h)) ->
-                        translate x y $ color red $ lineLoop (rectanglePath w h)
-                        -- , Texture (color white $ lineLoop $ rectanglePath arenaWidth arenaHeight)
                 )
 
 -------------------------------------------
@@ -130,25 +121,14 @@ inputController event = case event of
 
 stepPos :: Float -> System' ()
 stepPos dt =
-        cmapM
-                ( \(Collidable (Pos x y) harrySize, Vel vX vY, Harry, harryId :: Entity) -> do
-                        let newPos = Pos (x + vX * dt) (y + vY * dt)
-                        let newHarryBox = Collidable newPos harrySize
-                        isCollision <- cfold (\acc (box :: Collidable, id' :: Entity) -> acc || (id' /= harryId && collidesWith newHarryBox box)) False
-                        if isCollision
-                                then pure (Pos x y, Vel 0 0)
-                                else pure (newPos, Vel vX vY)
-                )
-
-stepCollisionBox :: System' ()
-stepCollisionBox =
         cmap
-                ( \(p :: Pos, Collidable _ size) ->
-                        Collidable p size
+                ( \(Pos (x, y), Vel (vX, vY)) ->
+                        -- search for all entities with pos and vel attributes, update
+                        (Pos (x + vX * dt, y + vY * dt))
                 )
 
-stepVel :: System' ()
-stepVel =
+stepVel :: Float -> System' ()
+stepVel dt =
         cmap
                 ( \(d, Vel _ _) -> case d of
                         DirectionLeft -> Vel (-velocity) 0
