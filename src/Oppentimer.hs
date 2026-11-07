@@ -120,10 +120,10 @@ stepVel :: System' ()
 stepVel =
         cmap
                 ( \(d, Vel vX vY) -> case d of
-                        DirectionLeft -> Vel (-velocity) vY
-                        DirectionRight -> Vel velocity vY
-                        DirectionUp -> Vel vX velocity
-                        DirectionDown -> Vel vX (-velocity)
+                        DirectionLeft -> Vel (-velocity) 0
+                        DirectionRight -> Vel velocity 0
+                        DirectionUp -> Vel 0 velocity
+                        DirectionDown -> Vel 0 (-velocity)
                         DirectionStationary -> Vel 0 0
                 )
     where
