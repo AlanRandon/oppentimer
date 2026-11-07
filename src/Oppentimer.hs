@@ -52,9 +52,9 @@ inputController event = case event of
         EventKey (Char 'q') Down _ _ -> liftIO exitSuccess
         EventKey (SpecialKey KeySpace) Down _ _ -> cmap (\(Pos _) -> (Pos (0, 0), Vel (0, 0), DirectionStationary))
         EventKey (Char 'h') Down _ _ -> cmap (const DirectionLeft :: Direction -> Direction)
-        EventKey (Char 'j') Down _ _ -> cmap (const DirectionRight :: Direction -> Direction)
+        EventKey (Char 'j') Down _ _ -> cmap (const DirectionDown :: Direction -> Direction)
         EventKey (Char 'k') Down _ _ -> cmap (const DirectionUp :: Direction -> Direction)
-        EventKey (Char 'l') Down _ _ -> cmap (const DirectionDown :: Direction -> Direction)
+        EventKey (Char 'l') Down _ _ -> cmap (const DirectionRight :: Direction -> Direction)
         EventKey (Char _) Up _ _ -> cmap (const DirectionStationary :: Direction -> Direction)
         _ -> pure ()
 
@@ -70,10 +70,10 @@ stepVel :: Float -> System' ()
 stepVel dt =
         cmap
                 ( \(d, Vel (vX, vY)) -> case d of
-                        DirectionLeft -> Vel (10, vY)
-                        DirectionRight -> Vel (-10, vY)
-                        DirectionUp -> Vel (vX, 10)
-                        DirectionDown -> Vel (vX, -10)
+                        DirectionLeft -> Vel (-30, vY)
+                        DirectionRight -> Vel (30, vY)
+                        DirectionUp -> Vel (vX, 30)
+                        DirectionDown -> Vel (vX, -30)
                         DirectionStationary -> Vel (0, 0)
                 )
 
