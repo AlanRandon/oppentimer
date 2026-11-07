@@ -11,9 +11,8 @@ import Apecs.Gloss
 import Data.Set (Set, fromList, member, singleton)
 import Graphics.Gloss (BitmapData (bitmapSize))
 import Graphics.Gloss.Juicy (loadJuicyPNG)
+import Oppentimer.Clock (Clock, newClock, tickClock, viewClock)
 import System.Exit (exitSuccess)
-
--- import Oppentimer.Clock (Clock)
 
 -------------------------------------------
 -- Components
@@ -66,7 +65,7 @@ makeWorld
         , ''Collidable
         , ''Scene
         , ''VisibleInScenes
-        -- , ''Clock
+        , ''Clock
         ]
 
 type System' a = System Model a
@@ -254,11 +253,11 @@ createEntities = do
                 )
 
         -- oppentimer
-        -- newEntity_
-        --        ( Pos 0 0
-        --        , Texture (translate 100 100 $ scale 0.1 0.1 $ color white $ text "4:59")
-        -- 	,
-        --        )
+        newEntity_
+                ( Pos 0 0
+                , newClock 300
+                , VisibleInScenes (singleton BattleDan)
+                )
         ---------------------------------------
         ---          death scene            ---
         ---------------------------------------
@@ -289,13 +288,15 @@ game = do
                 ( do
                         p1 <- view
                         p2 <- viewHitboxes
-                        pure $ pictures [p1, p2]
+                        p3 <- foldDraw viewClock
+                        pure $ pictures [p1, p2, p3]
                 )
                 inputController
                 ( \dt -> do
                         stepPos dt
                         stepVel
                         stepCollisionBox
+                        cmap (tickClock dt)
                 )
     where
         display = InWindow "Basic" (1024, 1024) (10, 10)
