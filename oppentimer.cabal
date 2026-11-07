@@ -13,6 +13,7 @@ executable example
     main-is:          Main.hs
     other-modules:
         Oppentimer
+        Cutscene
     build-depends:
         apecs,
         apecs-gloss,
