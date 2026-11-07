@@ -39,15 +39,17 @@ data Size = Size Float Float
 data Collidable = Collidable Pos Size
 instance Component Collidable where type Storage Collidable = Map Collidable
 
+data TimeToLive = TimeToLive Float
+instance Component TimeToLive where type Storage TimeToLive = Map TimeToLive
+
 data Harry = Harry
 instance Component Harry where type Storage Harry = Map Harry
 
+data RoadmanSpawner = RoadmanSpawner Float Texture
+instance Component RoadmanSpawner where type Storage RoadmanSpawner = Map RoadmanSpawner
+
 data Roadman = Roadman
 instance Component Roadman where type Storage Roadman = Map Roadman
-
--- newdata CountDownSeconds = CountDownSeconds Float
-
--- data RoadmanSpawner = RoadmanSpawner Float
 
 data Scene = BattleOppenheimer | Death | Win deriving (Eq, Ord)
 instance Component Scene where type Storage Scene = Map Scene
@@ -70,8 +72,11 @@ makeWorld
         , ''Direction
         , ''Texture
         , ''Wall
+        , ''RoadmanSpawner
+        , ''Roadman
         , ''Harry
         , ''Collidable
+        , ''TimeToLive
         , ''Scene
         , ''VisibleInScenes
         , ''Timer
@@ -138,6 +143,14 @@ inputController event = case event of
 
 stepHarryPhysics :: Float -> System' ()
 stepHarryPhysics dt = do
+        cmap
+                ( \(d, Vel _ _, Harry) -> case d of
+                        DirectionLeft -> Vel (-velocity) 0
+                        DirectionRight -> Vel velocity 0
+                        DirectionUp -> Vel 0 velocity
+                        DirectionDown -> Vel 0 (-velocity)
+                        DirectionStationary -> Vel 0 0
+                )
         cmapM
                 ( \(Collidable (Pos x y) harrySize, Vel vX vY, Harry, harryId :: Entity) -> do
                         let newPos = Pos (x + vX * dt) (y + vY * dt)
@@ -147,16 +160,34 @@ stepHarryPhysics dt = do
                                 then pure (Pos x y, Vel 0 0)
                                 else pure (newPos, Vel vX vY)
                 )
-        cmap
-                ( \(d, Vel _ _, Harry) -> case d of
-                        DirectionLeft -> Vel (-velocity) 0
-                        DirectionRight -> Vel velocity 0
-                        DirectionUp -> Vel 0 velocity
-                        DirectionDown -> Vel 0 (-velocity)
-                        DirectionStationary -> Vel 0 0
-                )
     where
         velocity = 50
+
+stepRoadmanSpawners :: Float -> System' ()
+stepRoadmanSpawners dt =
+        cmapM
+                ( \(RoadmanSpawner t roadmanBmp) -> do
+                        if t > 0
+                                then pure $ RoadmanSpawner (t - dt) roadmanBmp
+                                else
+                                        newEntity_
+                                                ( (Pos 0 0)
+                                                , Vel 20 0
+                                                , roadmanBmp
+                                                , VisibleInScenes (singleton BattleOppenheimer)
+                                                )
+                                                >> (pure $ RoadmanSpawner (0.5) roadmanBmp)
+                )
+
+-- stepTimeToLive :: Float -> System' ()
+-- stepTimeToLive dt = do
+--         cmap (\(TimeToLive t) -> TimeToLive (t - dt))
+--         cmapM_
+--                 ( \(TimeToLive t, e :: Entity) -> do
+--                         if t > 0
+--                                 then pure ()
+--                                 else cmapM (\(e' :: Entity) -> if e' == e then destroy e TimeToLive else pure ())
+--                 )
 
 stepRoadmanPhysics :: Float -> System' ()
 stepRoadmanPhysics dt =
@@ -289,11 +320,7 @@ createEntities = do
         -- roadman
         SpriteData (Size roadmanWidth roadmanHeight) (Texture roadmanBmp) <- liftIO $ loadSprite 20 "assets/characters/roadman.png"
         newEntity_
-                ( (Pos 0 0)
-                , Vel 10 0
-                , Texture roadmanBmp
-                , VisibleInScenes (singleton BattleOppenheimer)
-                )
+                (RoadmanSpawner 0 (Texture roadmanBmp))
 
         -- oppentimer
         newEntity_
@@ -340,6 +367,7 @@ game = do
                         stepHarryPhysics dt
                         stepHarryPhysics dt
                         stepRoadmanPhysics dt
+                        stepRoadmanSpawners dt
                         stepCheckWin
                         stepCollisionBox
                         cmap (tickTimer dt)
