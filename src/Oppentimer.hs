@@ -31,7 +31,7 @@ instance Component Pos where type Storage Pos = Map Pos
 data Vel = Vel Float Float
 instance Component Vel where type Storage Vel = Map Vel
 
-data Direction = DirectionLeft | DirectionRight | DirectionUp | DirectionDown | DirectionStationary
+data Direction = DirectionLeft | DirectionRight | DirectionUp | DirectionDown | DirectionStationary deriving (Show, Eq)
 instance Component Direction where type Storage Direction = Map Direction
 
 data Wall = Wall
@@ -166,10 +166,18 @@ inputControllerBattle event = case event of
                 liftIO exitSuccess
         EventKey (Char 'q') Down _ _ -> liftIO exitSuccess
         EventKey (Char '`') Down _ _ -> cmap (const Win :: Scene -> Scene)
-        EventKey (k) Down _ _ -> case k `M.lookup` directionBinds of
+        EventKey k Down _ _ -> case k `M.lookup` directionBinds of
                 Just bind -> cmap (const bind :: Direction -> Direction)
                 Nothing -> pure ()
-        EventKey _ Up _ _ -> cmap (const DirectionStationary :: Direction -> Direction)
+        EventKey k Up _ _ ->
+                cmap
+                        ( \currentDir ->
+                                if k `M.lookup` directionBinds == Just currentDir
+                                        then
+                                                DirectionStationary
+                                        else
+                                                currentDir
+                        )
         _ -> pure ()
 
 inputControllerTitleScreen :: Event -> System' ()
@@ -349,7 +357,6 @@ loadSprite scale' path = do
         let imageScale = imageWidth / (fromIntegral (fst $ bitmapSize imageBmp) :: Float)
         let imageHeight = imageScale * (fromIntegral . snd $ bitmapSize imageBmp)
         let imageBmp' = scale imageScale imageScale $ bitmap imageBmp
-
         pure $ SpriteData (Size imageWidth imageHeight) (Texture imageBmp')
 
 resetEntities :: System' ()
@@ -362,6 +369,7 @@ resetEntities = do
                         , DirectionStationary
                         )
                 )
+        cmap (\(_ :: Timer) -> newTimer (5 * 60))
 
 createEntities :: System' ()
 createEntities = do
@@ -432,7 +440,7 @@ createEntities = do
         -- oppentimer
         newEntity_
                 ( Pos 0 150
-                , newTimer (5 * 60)
+                , newTimer 0
                 , VisibleInScenes (singleton BattleOppenheimer)
                 )
 

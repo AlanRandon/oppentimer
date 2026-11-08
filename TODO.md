@@ -2,11 +2,11 @@
     - [x] player movement
     - [x] player (health, damage)
     - [x] player collisions
-    - [ ] restart
+    - [x] restart
     - [ ] title cutscene
     - [ ] ybj wallace
     - [ ] evil harry
-    - [ ] win screen
+    - [x] win screen
     - [ ] fixed resolution window
     - [ ] force fullscreen
 - BATTLE SYSTEM
