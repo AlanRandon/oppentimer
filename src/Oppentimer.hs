@@ -51,7 +51,7 @@ data HarryState = HarryNormal | HarryEvil Int
 
 harryStateHit :: HarryState -> HarryState
 harryStateHit HarryNormal = HarryNormal
-harryStateHit (HarryEvil 0) = HarryNormal
+harryStateHit (HarryEvil 1) = HarryNormal
 harryStateHit (HarryEvil remainingHits) = HarryEvil (remainingHits - 1)
 
 data Harry = Harry
@@ -93,7 +93,7 @@ arenaWidth = 300
 arenaHeight = 150
 arenaX = 0
 arenaY = -80
-roadmanWidth = 10
+roadmanWidth = 15
 playerWidth = 20
 survivalTime = 5 * 60
 harryVelocity = 50
@@ -252,21 +252,29 @@ stepHarryPhysics dt = do
                         DirectionDown -> Vel 0 (-harryVelocity)
                         DirectionStationary -> Vel 0 0
                 )
+        -- collide with walls
         cmapM
-                ( \(harryPos :: Pos, harryBox, Vel vX vY, harry :: Harry, harryId :: Entity) -> do
-                        -- collide with walls
-                        _ <- do
-                                let Pos x y = harryPos
-                                let newPos = Pos (x + vX * dt) (y + vY * dt)
-                                isCollision <-
-                                        cfold
-                                                ( \acc (pos, box, id' :: Entity) ->
-                                                        acc || (id' /= harryId && (newPos, harryBox) `collidesWith` (pos, box))
-                                                )
-                                                False
-                                if isCollision
-                                        then pure (Pos x y, Vel 0 0)
-                                        else pure (newPos, Vel vX vY)
+                ( \(harryPos, harryBox, _ :: Harry, Vel vX vY, harryId :: Entity) -> do
+                        let Pos x y = harryPos
+                        let newPos = Pos (x + vX * dt) (y + vY * dt)
+                        let futurePos = Pos (x + vX * 2 * dt) (y + vY * 2 * dt)
+                        isCollision <-
+                                cfold
+                                        ( \acc (pos, box, id' :: Entity, Wall) ->
+                                                let isCollision =
+                                                        (newPos, harryBox) `collidesWith` (pos, box)
+                                                                || (futurePos, harryBox) `collidesWith` (pos, box)
+                                                 in acc || (id' /= harryId && isCollision)
+                                        )
+                                        False
+                        if isCollision
+                                then pure (Pos x y, Vel 0 0)
+                                else pure (newPos, Vel vX vY)
+                )
+        cmapM
+                ( \(harry, harryId :: Entity) -> do
+                        harryPos <- get harryId
+                        harryBox <- get harryId
 
                         -- collide with roadmen
                         cmapM_
@@ -317,15 +325,17 @@ stepRoadmanSpawners dt =
                                                                 (r :: Float, gen') = randomR (200, 300) gen
                                                                 (theta :: Float, gen'') = randomR (0, 2 * pi) gen'
                                                                 (variant :: Float, gen''') = randomR (0, 1) gen''
+                                                                (speed :: Float, gen'''') = randomR (40, 100) gen'''
                                                                 offset = (r * sin theta, r * cos theta)
                                                                 roadmanPos = uncurry Pos $ offset `addVec` harryPos
                                                                 normalisedVec = normaliseVec (negateVec offset)
+                                                                vel = uncurry Vel $ speed `multVec` normalisedVec
                                                          in
                                                                 ( if variant < 0.1
                                                                         then
                                                                                 newEntity_
                                                                                         ( roadmanPos
-                                                                                        , uncurry Vel $ 80 `multVec` normalisedVec
+                                                                                        , vel
                                                                                         , spawnerWallaceTexture spawner
                                                                                         , VisibleInScenes (singleton BattleOppenheimer)
                                                                                         , Collidable (Size roadmanWidth roadmanWidth)
@@ -335,7 +345,7 @@ stepRoadmanSpawners dt =
                                                                         else
                                                                                 newEntity_
                                                                                         ( roadmanPos
-                                                                                        , uncurry Vel $ 80 `multVec` normalisedVec
+                                                                                        , vel
                                                                                         , spawnerRoadmanTexture spawner
                                                                                         , VisibleInScenes (singleton BattleOppenheimer)
                                                                                         , Collidable (Size roadmanWidth roadmanWidth)
@@ -343,7 +353,7 @@ stepRoadmanSpawners dt =
                                                                                         , TimeToLive 10
                                                                                         )
                                                                 )
-                                                                        >> (pure $ spawner{spawnerDelay = 0.5, spawnerGen = gen'''})
+                                                                        >> (pure $ spawner{spawnerDelay = 0.5, spawnerGen = gen''''})
                                 )
                 )
 
