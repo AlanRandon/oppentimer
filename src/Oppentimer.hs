@@ -20,6 +20,7 @@ import Oppentimer.Timer (Timer, getTime, isExpired, newTimer, tickTimer)
 import Oppentimer.Vector (addVec, multVec, negateVec, normaliseVec)
 import System.Exit (exitSuccess)
 import System.Random (Random (randomR), StdGen, initStdGen)
+import Text.Printf (printf)
 
 -------------------------------------------
 -- Components
@@ -38,6 +39,9 @@ instance Component Direction where type Storage Direction = Map Direction
 
 data Wall = Wall
 instance Component Wall where type Storage Wall = Map Wall
+
+data WallaceCount = WallaceCount Int
+instance Component WallaceCount where type Storage WallaceCount = Map WallaceCount
 
 data Size = Size Float Float
 
@@ -76,7 +80,13 @@ instance Component RoadmanSpawner where type Storage RoadmanSpawner = Map Roadma
 data Roadman = Roadman
 instance Component Roadman where type Storage Roadman = Map Roadman
 
-data Scene = BattleOppenheimer | Death | Win | TitleScreen deriving (Eq, Ord)
+data Scene
+        = TitleCutscene
+        | TitleScreen
+        | BattleOppenheimer
+        | Death
+        | Win
+        deriving (Eq, Ord, Enum)
 instance Component Scene where type Storage Scene = Map Scene
 
 data VisibleInScenes = VisibleInScenes (Set Scene)
@@ -120,6 +130,7 @@ makeWorld
         , ''CenteredText
         , ''Timer
         , ''Wallace
+        , ''WallaceCount
         ]
 
 type System' a = System Model a
@@ -139,7 +150,9 @@ type DestructableComponents =
           , Pos
           , Vel
           , CenteredText
-          , Wallace
+          , ( WallaceCount
+            , Wallace
+            )
           )
         )
 
@@ -173,8 +186,8 @@ view = do
                         pure $ pictures [p1, p2]
                 )
 
-viewHitboxes :: System' Picture
-viewHitboxes =
+_viewHitboxes :: System' Picture
+_viewHitboxes =
         foldDraw -- hitboxes and stuff
                 ( \(Pos x y, Collidable (Size w h)) ->
                         translate x y $ color red $ lineLoop (rectanglePath w h)
@@ -219,6 +232,12 @@ inputControllerBattle event = case event of
                                         else
                                                 currentDir
                         )
+        _ -> pure ()
+
+inputControllerCutscene :: Event -> System' ()
+inputControllerCutscene event = case event of
+        EventKey (Char 'q') Down _ _ -> liftIO exitSuccess
+        EventKey (Char 'c') Down _ _ -> cmap (succ :: Scene -> Scene)
         _ -> pure ()
 
 inputControllerTitleScreen :: Event -> System' ()
@@ -302,6 +321,7 @@ stepHarryPhysics dt = do
                                                 then do
                                                         destroy wallaceId (Proxy @DestructableComponents)
                                                         set harryId harry{harryState = HarryEvil 3}
+                                                        cmap (\(WallaceCount n) -> WallaceCount (n + 1))
                                                 else pure ()
                                 )
                 )
@@ -311,6 +331,9 @@ stepHarryPhysics dt = do
                                 HarryNormal -> (harryNormalTexture harry)
                                 HarryEvil _ -> (harryEvilTexture harry)
                 )
+
+stepWallaceCounts :: System' ()
+stepWallaceCounts = cmap (\(WallaceCount n) -> CenteredText (printf "Wallace count: %d" n) white 0.1)
 
 stepRoadmanSpawners :: Float -> System' ()
 stepRoadmanSpawners dt =
@@ -453,11 +476,13 @@ resetEntities = do
                 )
         cmap (\(_ :: Timer) -> newTimer survivalTime)
         cmap (\(spawner :: RoadmanSpawner) -> spawner{spawnerDelay = 1.0})
+        cmap (\(WallaceCount _) -> WallaceCount 0)
 
 createEntities :: System' ()
 createEntities = do
         -- set the scene
-        newEntity_ TitleScreen
+        newEntity_
+                (TitleCutscene)
 
         ---------------------------------------
         ---          battle scene           ---
@@ -547,9 +572,12 @@ createEntities = do
                 , VisibleInScenes (singleton BattleOppenheimer)
                 )
 
+        ---------------------------------------
+        ---           death scene           ---
+        ---------------------------------------
         newEntity_
                 ( Pos 0 75
-                , CenteredText "You got fairs-ed by a roadman :(" white 0.1
+                , CenteredText "Oppenheimer wins - Birmingham survives :(" white 0.1
                 , VisibleInScenes (singleton Death)
                 )
 
@@ -563,6 +591,9 @@ createEntities = do
                 , VisibleInScenes (singleton Death)
                 )
 
+        ---------------------------------------
+        ---            win scene            ---
+        ---------------------------------------
         newEntity_
                 ( Pos 0 75
                 , CenteredText "OPPENTIMER" white 0.2
@@ -571,24 +602,84 @@ createEntities = do
 
         newEntity_
                 ( Pos 0 75
-                , CenteredText "YOU HAVE BECOME DEATH, DESTROYER OF WORLDS" white 0.1
+                , CenteredText "YOU HAVE BECOME DEATH, DESTROYER OF WORLDS (you win)" white 0.1
                 , VisibleInScenes (singleton Win)
-                )
-
-        newEntity_
-                ( Pos 0 (-75)
-                , CenteredText "PRESS c TO CONTINUE" white 0.1
-                , VisibleInScenes (S.fromList [TitleScreen, Win, Death])
                 )
 
         SpriteData
                 (Size _nuclearWidth _nuclearHeight)
                 (Texture nuclearBmp) <-
                 liftIO $ loadSprite 100 "assets/other/oppenheimer_bullet.png"
+
         newEntity_
                 ( Pos 0 0
                 , Texture nuclearBmp
                 , VisibleInScenes (S.fromList [TitleScreen, Win])
+                )
+        newEntity_
+                ( WallaceCount 0
+                , VisibleInScenes (singleton Win)
+                , Pos 0 90
+                )
+
+        ----------------------------------------
+        -------- title cutscene text -----------
+        ----------------------------------------
+        newEntity_
+                ( Pos 0 90
+                , CenteredText "harry stevens and his friends go to Birmingham" white 0.07
+                , VisibleInScenes (singleton TitleCutscene)
+                )
+        newEntity_
+                ( Pos 0 80
+                , CenteredText "his friends die to roadmen" white 0.07
+                , VisibleInScenes (singleton TitleCutscene)
+                )
+        newEntity_
+                ( Pos 0 70
+                , CenteredText "10 years later..." white 0.07
+                , VisibleInScenes (singleton TitleCutscene)
+                )
+        newEntity_
+                ( Pos 0 60
+                , CenteredText "harry builds a time machine" white 0.07
+                , VisibleInScenes (singleton TitleCutscene)
+                )
+        newEntity_
+                ( Pos 0 50
+                , CenteredText "harry infiltrates the manhatten projek" white 0.07
+                , VisibleInScenes (singleton TitleCutscene)
+                )
+        newEntity_
+                ( Pos 0 40
+                , CenteredText "harry forces researches at gunpoint to create a new nuke just for Birmingham" white 0.07
+                , VisibleInScenes (singleton TitleCutscene)
+                )
+        newEntity_
+                ( Pos 0 30
+                , CenteredText "present day..." white 0.07
+                , VisibleInScenes (singleton TitleCutscene)
+                )
+        newEntity_
+                ( Pos 0 20
+                , CenteredText "oppenheimer's third cousin removed is massacred in the nuking of Birmingham" white 0.07
+                , VisibleInScenes (singleton TitleCutscene)
+                )
+        newEntity_
+                ( Pos 0 10
+                , CenteredText "oppenheimer time travels to Birmingham to try and kill you to stop it" white 0.07
+                , VisibleInScenes (singleton TitleCutscene)
+                )
+        newEntity_
+                ( Pos 0 0
+                , CenteredText "the limits of his time machine give you 5 minutes to survive against his roadman army" white 0.07
+                , VisibleInScenes (singleton TitleCutscene)
+                )
+
+        newEntity_
+                ( Pos 0 (-75)
+                , CenteredText "PRESS c TO CONTINUE" white 0.1
+                , VisibleInScenes (S.fromList [TitleScreen, Win, Death, TitleCutscene])
                 )
 
         resetEntities
@@ -618,6 +709,7 @@ game = do
                                                 TitleScreen -> inputControllerTitleScreen event
                                                 Death -> inputControllerDeath event
                                                 Win -> inputControllerWin event
+                                                TitleCutscene -> inputControllerCutscene event
                                 )
                 )
                 ( \dt -> do
@@ -633,6 +725,7 @@ game = do
                                                         stepTimers dt
                                                         stepClockText
                                                         stepCheckWin
+                                                        stepWallaceCounts
                                                 _ -> pure ()
                                 )
                         stepCenteredText
