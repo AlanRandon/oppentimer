@@ -62,6 +62,12 @@ instance Component VisibleInScenes where type Storage VisibleInScenes = Map Visi
 newtype Texture = Texture Picture
 instance Component Texture where type Storage Texture = Map Texture
 
+roadmanWidth :: Float
+roadmanWidth = 20
+
+playerWidth :: Float
+playerWidth = 20
+
 -------------------------------------------
 -- Model
 -------------------------------------------
@@ -174,10 +180,17 @@ stepHarryPhysics dt = do
                 ( \(Collidable (Pos x y) harrySize, Vel vX vY, Harry, harryId :: Entity) -> do
                         let newPos = Pos (x + vX * dt) (y + vY * dt)
                         let newHarryBox = Collidable newPos harrySize
-                        isCollision <- cfold (\acc (box :: Collidable, id' :: Entity) -> acc || (id' /= harryId && collidesWith newHarryBox box)) False
+                        isCollision <- cfold (\acc (box, id' :: Entity) -> acc || (id' /= harryId && newHarryBox `collidesWith` box)) False
                         if isCollision
                                 then pure (Pos x y, Vel 0 0)
                                 else pure (newPos, Vel vX vY)
+                )
+        cmapM
+                ( \(harryBox :: Collidable, Harry, harryId :: Entity) -> do
+                        isCollision <- cfold (\acc (box, Roadman, id' :: Entity) -> acc || (id' /= harryId && harryBox `collidesWith` box)) False
+                        if isCollision
+                                then cmap (const Death :: Scene -> Scene)
+                                else pure ()
                 )
     where
         velocity = 50
@@ -218,6 +231,8 @@ stepRoadmanSpawners dt =
                                                                 , uncurry Vel $ 80 `multVec` normalisedVec
                                                                 , roadmanBmp
                                                                 , VisibleInScenes (singleton BattleOppenheimer)
+                                                                , Collidable roadmanPos (Size roadmanWidth roadmanWidth)
+                                                                , Roadman
                                                                 , TimeToLive 10
                                                                 )
                                                                 >> (pure $ RoadmanSpawner (0.5) roadmanBmp gen'')
@@ -352,7 +367,7 @@ createEntities = do
                 )
 
         -- harry
-        SpriteData (Size harryWidth harryHeight) (Texture harryBmp) <- liftIO $ loadSprite 20 "assets/characters/harry.png"
+        SpriteData (Size harryWidth harryHeight) (Texture harryBmp) <- liftIO $ loadSprite playerWidth "assets/characters/harry.png"
         newEntity_
                 ( Pos (arenaX) (arenaY)
                 , Harry
@@ -364,7 +379,7 @@ createEntities = do
                 )
 
         -- roadman
-        SpriteData (Size roadmanWidth roadmanHeight) (Texture roadmanBmp) <- liftIO $ loadSprite 20 "assets/characters/roadman.png"
+        SpriteData (Size roadmanWidth roadmanHeight) (Texture roadmanBmp) <- liftIO $ loadSprite roadmanWidth "assets/characters/roadman.png"
         newEntity_
                 (RoadmanSpawner 0 (Texture roadmanBmp) (mkStdGen 0))
 
