@@ -3,3 +3,23 @@
 Bristol CSS GameJam 2026
 
 "It's Haskell-ing time." (Haskells everywhere.)
+
+# CREDITS
+
+## PROGRAMMERS:
+
+- HASKELL: HARRY, ALAN
+- C INTEGRATION: TINRON, TOM
+
+## PLOT
+
+- WRITERS: HARRY, ALAN, TINRON, TOM
+
+## AUDIO
+
+- BEETHOVEN: TINRON
+
+## SPECIAL THANKS
+
+- YBJ WALLACE
+- DAVID
