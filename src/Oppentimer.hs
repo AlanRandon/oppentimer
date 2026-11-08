@@ -308,7 +308,7 @@ stepHarryPhysics dt = do
                                                 HarryNormal ->
                                                         if collision
                                                                 then do
-                                                                        _ <- liftIO $ haskellPlayAudio "assets/audio/foxy-scream-fnaf-1.mp3"
+                                                                        _ <- liftIO $ haskellPlayAudio "assets/audio/you_died.mp3"
                                                                         cmap (const Death :: Scene -> Scene)
                                                                 else pure ()
                                                 HarryEvil _ ->
