@@ -215,7 +215,7 @@ stepRoadmanSpawners dt =
                                                                 normalisedVec = normaliseVec (negateVec offset)
                                                         newEntity_
                                                                 ( roadmanPos
-                                                                , uncurry Vel $ 40 `multVec` normalisedVec
+                                                                , uncurry Vel $ 80 `multVec` normalisedVec
                                                                 , roadmanBmp
                                                                 , VisibleInScenes (singleton BattleOppenheimer)
                                                                 , TimeToLive 10
@@ -382,6 +382,13 @@ createEntities = do
         newEntity_
                 ( Pos 0 0
                 , Texture (translate 100 100 $ scale 0.1 0.1 $ color white $ text "You are dead")
+                , VisibleInScenes (singleton Death)
+                )
+        -- battle pass
+        SpriteData (Size battlePassWidth battlePassHeight) (Texture battlePassBmp) <- liftIO $ loadSprite 300 "assets/other/BATTLEPASS.png"
+        newEntity_
+                ( Pos 0 0
+                , Texture (battlePassBmp)
                 , VisibleInScenes (singleton Death)
                 )
     where
