@@ -15,6 +15,7 @@ executable example
         Oppentimer
         Oppentimer.Timer
         Oppentimer.Audio
+        Oppentimer.Text
         -- Cutscene
     build-depends:
         apecs,

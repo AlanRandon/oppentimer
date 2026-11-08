@@ -4,12 +4,9 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module Oppentimer.Timer (Timer, tickTimer, viewTimer, newTimer, isExpired) where
+module Oppentimer.Timer (Timer, tickTimer, newTimer, isExpired) where
 
-import Apecs
-import Apecs.Gloss
-import Graphics.UI.GLUT (GLint)
-import qualified Graphics.UI.GLUT.Fonts as Fonts
+import Apecs (Component (..), Map)
 import Text.Printf (printf)
 
 newtype TimeSeconds = TimeSeconds Float
@@ -24,9 +21,6 @@ instance Show Timer where
                 seconds = (floor n :: Int) `mod` 60
         show Ended = "00:00"
 
-textWidth :: String -> IO GLint
-textWidth = Fonts.stringWidth Fonts.Roman
-
 newTimer :: Float -> Timer
 newTimer = Running . TimeSeconds
 
@@ -38,13 +32,6 @@ tickTimer dt (Running (TimeSeconds n)) =
                 else Ended
     where
         newTime = (n - dt)
-
-viewTimer :: Timer -> IO Picture
-viewTimer timer = do
-        let text' = show timer
-        fontWidth <- textWidth text'
-        let renderedText = text text'
-        pure $ scale 0.1 0.1 $ translate (-fromIntegral fontWidth / 2) 0 $ renderedText
 
 isExpired :: Timer -> Bool
 isExpired Ended = True

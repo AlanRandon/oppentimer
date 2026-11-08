@@ -14,7 +14,8 @@ import Data.Set (Set, member, singleton)
 import Graphics.Gloss (BitmapData (bitmapSize))
 import Graphics.Gloss.Juicy (loadJuicyPNG)
 import Oppentimer.Audio (haskellPlayAudio)
-import Oppentimer.Timer (Timer, isExpired, newTimer, tickTimer, viewTimer)
+import Oppentimer.Text (centerText)
+import Oppentimer.Timer (Timer, isExpired, newTimer, tickTimer)
 import System.Exit (exitSuccess)
 import System.Random (Random (randomR), StdGen, mkStdGen)
 
@@ -59,8 +60,11 @@ instance Component Scene where type Storage Scene = Map Scene
 data VisibleInScenes = VisibleInScenes (Set Scene)
 instance Component VisibleInScenes where type Storage VisibleInScenes = Map VisibleInScenes
 
-newtype Texture = Texture Picture
+data Texture = Texture Picture deriving (Show)
 instance Component Texture where type Storage Texture = Map Texture
+
+data CenteredText = CenteredText String Color Float deriving (Show)
+instance Component CenteredText where type Storage CenteredText = Map CenteredText
 
 arenaWidth, arenaHeight, arenaX, arenaY, playerWidth, roadmanWidth :: Float
 arenaWidth = 300
@@ -89,6 +93,7 @@ makeWorld
         , ''TimeToLive
         , ''Scene
         , ''VisibleInScenes
+        , ''CenteredText
         , ''Timer
         ]
 
@@ -269,9 +274,8 @@ stepTimeToLive dt = do
                                 else pure ()
                 )
 
-stepClockTexture :: System' ()
-stepClockTexture = do
-        cmapM (\(timer :: Timer) -> liftIO $ fmap (Texture . translate 0 150 . color white) $ viewTimer timer)
+stepClockText :: System' ()
+stepClockText = cmap (\(timer :: Timer) -> CenteredText (show timer) white 0.1)
 
 stepRoadmanPhysics :: Float -> System' ()
 stepRoadmanPhysics dt =
@@ -292,6 +296,16 @@ stepCheckWin =
                                 then cmapM (\(_ :: Scene) -> pure Win)
                                 else pure ()
                 )
+
+stepCenteredText :: System' ()
+stepCenteredText =
+        cmapM
+                ( \(CenteredText s color' scale') -> do
+                        liftIO $ fmap (Texture . color color' . scale scale' scale') . centerText $ s
+                )
+
+stepTimers :: Float -> System' ()
+stepTimers dt = cmap (tickTimer dt)
 
 collidesWith :: Collidable -> Collidable -> Bool
 collidesWith
@@ -417,7 +431,7 @@ createEntities = do
 
         -- oppentimer
         newEntity_
-                ( Pos 0 0
+                ( Pos 0 150
                 , newTimer (5 * 60)
                 , VisibleInScenes (singleton BattleOppenheimer)
                 )
@@ -426,17 +440,24 @@ createEntities = do
         ---          death scene            ---
         ---------------------------------------
         -- death scene text
+
+        newEntity_
+                ( Pos 0 100
+                , CenteredText "You are dead" white 0.1
+                , VisibleInScenes (singleton Death)
+                )
+
         newEntity_
                 ( Pos 0 0
-                , Texture (translate 100 100 $ scale 0.1 0.1 $ color white $ text "You are dead")
-                , VisibleInScenes (singleton Death)
+                , CenteredText "Oppentimer" white 0.2
+                , VisibleInScenes (singleton TitleScreen)
                 )
 
         -- battle pass
         SpriteData (Size _battlePassWidth _battlePassHeight) (Texture battlePassBmp) <- liftIO $ loadSprite 300 "assets/other/BATTLEPASS.png"
         newEntity_
                 ( Pos 0 0
-                , Texture (battlePassBmp)
+                , Texture battlePassBmp
                 , VisibleInScenes (singleton Death)
                 )
 
@@ -478,35 +499,17 @@ game = do
                                                         stepHarryPhysics dt
                                                         stepRoadmanPhysics dt
                                                         stepRoadmanSpawners dt
-                                                        stepClockTexture
+                                                        stepTimeToLive dt
+                                                        stepTimers dt
+                                                        stepClockText
                                                         stepCheckWin
                                                         stepCollisionBox
                                                 _ -> pure ()
                                 )
-                        stepTimeToLive dt
-                        cmap (tickTimer dt)
+                        stepCenteredText
                 )
     where
         display = InWindow "Basic" (1024, 1024) (10, 10)
-
--- newtype TimeSeconds = TimeSeconds Float
-
--- data Clock = Running TimeSeconds | Ended
--- instance Component Clock where type Storage Clock = Map Clock
-
--- newClock :: Float -> Clock
--- newClock = Running . TimeSeconds
-
--- tickClock :: Float -> Clock -> Clock
--- tickClock dt (Running (TimeSeconds n)) = Running $ TimeSeconds (n - dt)
--- tickClock _ Ended = Ended
-
--- viewClock :: Clock -> Picture
--- viewClock (Running (TimeSeconds n)) = text ((show minutes) ++ ":" ++ (show seconds))
---     where
---         minutes = (floor n :: Int) `div` 60
---         seconds = if (n - ((fromIntegral minutes) * 60) < 10) then "0" ++ (show seconds) else show ((floor n) - (minutes * 60))
--- viewClock (Ended) = text ("0:00")
 
 oppentimerMain :: IO ()
 oppentimerMain = do
