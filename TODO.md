@@ -3,7 +3,7 @@
     - [x] player (health, damage)
     - [x] player collisions
     - [x] restart
-    - [ ] title cutscene
+    - [x] title "cutscene"
     - [x] ybj wallace
     - [x] evil harry
     - [x] win screen
@@ -13,7 +13,7 @@
     - [ ] battle UI
     - [x] bullet spawning
     - [x] bullet damage
-    - [ ] player actions (attack, damage)
+    - [x] player actions (attack, damage)
     - [ ] boss stats (attack, damage)
 - AUDIO
     - [x] boss audio
