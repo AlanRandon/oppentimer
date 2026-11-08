@@ -7,6 +7,6 @@ import Foreign.C.Types (CInt (..))
 foreign import ccall unsafe "tPlayAudio"
         tPlayAudio :: CString -> IO CInt
 
-haskellPlayAudio :: String -> IO CInt
+haskellPlayAudio :: String -> IO ()
 haskellPlayAudio file_path = do
-        withCAString file_path tPlayAudio
+        withCAString file_path tPlayAudio >> pure ()

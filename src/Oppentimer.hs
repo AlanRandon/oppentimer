@@ -283,7 +283,9 @@ stepHarryPhysics dt = do
                                         case harryState harry of
                                                 HarryNormal ->
                                                         if collision
-                                                                then cmap (const Death :: Scene -> Scene)
+                                                                then do
+                                                                        _ <- liftIO $ haskellPlayAudio "assets/audio/foxy-scream-fnaf-1.mp3"
+                                                                        cmap (const Death :: Scene -> Scene)
                                                                 else pure ()
                                                 HarryEvil _ ->
                                                         if collision
@@ -545,18 +547,12 @@ createEntities = do
                 , VisibleInScenes (singleton BattleOppenheimer)
                 )
 
-        ---------------------------------------
-        ---          death scene            ---
-        ---------------------------------------
-        -- death scene text
-
         newEntity_
-                ( Pos 0 100
+                ( Pos 0 75
                 , CenteredText "You got fairs-ed by a roadman :(" white 0.1
                 , VisibleInScenes (singleton Death)
                 )
 
-        -- battle pass
         SpriteData
                 (Size _battlePassWidth _battlePassHeight)
                 (Texture battlePassBmp) <-
@@ -582,7 +578,7 @@ createEntities = do
         newEntity_
                 ( Pos 0 (-75)
                 , CenteredText "PRESS c TO CONTINUE" white 0.1
-                , VisibleInScenes (S.fromList [TitleScreen, Win])
+                , VisibleInScenes (S.fromList [TitleScreen, Win, Death])
                 )
 
         SpriteData
@@ -647,5 +643,4 @@ game = do
 oppentimerMain :: IO ()
 oppentimerMain = do
         w <- initModel
-        _ <- haskellPlayAudio "src/AUDIO_FFI_STUFF/foxy-scream-fnaf-1.mp3"
         runWith w game
