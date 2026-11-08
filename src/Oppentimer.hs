@@ -245,8 +245,13 @@ inputControllerTitleScreen event = case event of
         EventKey (SpecialKey KeyEsc) Down _ _ ->
                 liftIO exitSuccess
         EventKey (Char 'q') Down _ _ -> liftIO exitSuccess
-        EventKey (Char 'c') Down _ _ -> cmap (const BattleOppenheimer :: Scene -> Scene)
+        EventKey (Char 'c') Down _ _ -> startBattle
         _ -> pure ()
+
+startBattle :: System' ()
+startBattle = do
+        liftIO $ haskellPlayAudio "assets/audio/boss_theme.mp3"
+        cmap (const BattleOppenheimer :: Scene -> Scene)
 
 inputControllerDeath :: Event -> System' ()
 inputControllerDeath event = case event of
@@ -255,7 +260,7 @@ inputControllerDeath event = case event of
         EventKey (Char 'q') Down _ _ -> liftIO exitSuccess
         EventKey (Char 'c') Down _ _ -> do
                 resetEntities
-                cmap (const BattleOppenheimer :: Scene -> Scene)
+                startBattle
         _ -> pure ()
 
 inputControllerWin :: Event -> System' ()

@@ -9,10 +9,14 @@
 #include "miniaudio.h"
 #include <pthread.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <time.h>
 
 #pragma clang diagnostic pop
 #pragma gcc diagnostic pop
+
+static bool engineInitialised = false;
+static ma_engine engine;
 
 void data_callback(ma_device *pDevice, void *pOutput, const void *pInput,
                    ma_uint32 frameCount) {
@@ -26,48 +30,28 @@ void data_callback(ma_device *pDevice, void *pOutput, const void *pInput,
   (void)pInput;
 }
 
-void *playAudio(void *data) {
-  char filePath[1024] = {0};
-  snprintf(filePath, sizeof(filePath), "%s", (char *)data);
-  free(data);
-
+void playAudio(char *filePath) {
   ma_result result;
-  ma_engine engine;
 
-  result = ma_engine_init(NULL, &engine);
-  if (result != MA_SUCCESS) {
-    printf("Failed to initialize audio engine.");
-    exit(1);
+  if (!engineInitialised) {
+    result = ma_engine_init(NULL, &engine);
+    if (result != MA_SUCCESS) {
+      printf("Failed to initialize audio engine.");
+      exit(1);
+    }
+    engineInitialised = true;
   }
 
-  ma_sound sound;
-  result = ma_sound_init_from_file(&engine, filePath, 0, NULL, NULL, &sound);
-  if (result != MA_SUCCESS) {
-    printf("Failed to load sound file.");
-    exit(1);
-  }
+  ma_engine_set_time_in_pcm_frames(&engine, 60 * 10 * 42000);
+  ma_engine_stop(&engine);
+  ma_engine_get_node_graph(&engine);
 
-  ma_sound_start(&sound);
-  while (ma_sound_at_end(&sound) == 0) {
-    sleep(1);
-  }
-
-  ma_sound_stop(&sound);
-  ma_engine_uninit(&engine);
-  return NULL;
+  ma_engine_play_sound(&engine, filePath, NULL);
+  ma_engine_start(&engine);
 }
 
 int tPlayAudio(char filePath[]) {
-  char *dupedFilePath = malloc(strlen(filePath) + 1);
-  if (dupedFilePath == NULL) {
-    abort();
-  }
-
-  strcpy(dupedFilePath, filePath);
-
-  pthread_t thread;
-  pthread_create(&thread, NULL, playAudio, dupedFilePath);
-  pthread_detach(thread);
+  playAudio(filePath);
   return 0;
 }
 
