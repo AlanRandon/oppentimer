@@ -1,26 +1,24 @@
 - BASICS 
     - [x] player movement
-    - [ ] player (health, damage)
+    - [x] player (health, damage)
     - [x] player collisions
+    - [ ] restart
+    - [ ] title cutscene
+    - [ ] ybj wallace
+    - [ ] evil harry
+    - [ ] win screen
+    - [ ] fixed resolution window
+    - [ ] force fullscreen
 - BATTLE SYSTEM
     - [ ] battle UI
-    - [ ] bullet spawning
-    - [ ] bullet damage
+    - [x] bullet spawning
+    - [x] bullet damage
     - [ ] player actions (attack, damage)
     - [ ] boss stats (attack, damage)
-- LEVELS
-    - [ ] MOVE CAMERA
-    - [ ] MOVE PLAYER
-    - [ ] CHANCE TO TRIGGER ROADMAN ENCOUNTER
 - AUDIO
-    - [ ] boss audio
-    - [ ] level audio
+    - [x] boss audio
     - [ ] cutscene audio
 - BOSSES
-    - [ ] TILO
-    - [ ] PAGE
-    - [ ] SAM (ALTMAN)
-    - [ ] OPPENHEIMER
+    - [x] OPPENHEIMER
 - STORY
-    - [ ] CUTSCENE SYSTEM
-    - [ ] DIALOGUE SYSTEM
+    - [x] CUTSCENE SYSTEM
