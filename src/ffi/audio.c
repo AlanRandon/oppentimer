@@ -43,11 +43,10 @@ void playAudio(char *filePath) {
   }
 
   ma_engine_set_time_in_pcm_frames(&engine, 60 * 10 * 42000);
-  ma_engine_stop(&engine);
+  // ma_engine_stop(&engine);
   ma_engine_get_node_graph(&engine);
-
   ma_engine_play_sound(&engine, filePath, NULL);
-  ma_engine_start(&engine);
+  // ma_engine_start(&engine);
 }
 
 int tPlayAudio(char filePath[]) {

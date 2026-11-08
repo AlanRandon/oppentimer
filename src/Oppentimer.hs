@@ -409,7 +409,12 @@ stepCheckWin =
         cmapM
                 ( \(timer :: Timer) ->
                         if isExpired timer
-                                then cmapM (\(_ :: Scene) -> pure Win)
+                                then
+                                        cmapM
+                                                ( \(_ :: Scene) -> do
+                                                        liftIO $ haskellPlayAudio "assets/audio/ending_theme.mp3"
+                                                        pure Win
+                                                )
                                 else pure ()
                 )
 
@@ -480,7 +485,7 @@ resetEntities = do
                         )
                 )
         cmap (\(_ :: Timer) -> newTimer survivalTime)
-        cmap (\(spawner :: RoadmanSpawner) -> spawner{spawnerDelay = 1.0})
+        cmap (\(spawner :: RoadmanSpawner) -> spawner{spawnerDelay = 2.0})
         cmap (\(WallaceCount _) -> WallaceCount 0)
 
 createEntities :: System' ()
