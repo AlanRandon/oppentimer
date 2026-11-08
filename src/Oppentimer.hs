@@ -114,15 +114,16 @@ type DestructableComponents =
 -------------------------------------------
 
 view :: System' Picture
-view =
+view = do
         foldDrawM
-                ( \(scene :: Scene) ->
+                ( \(scene :: Scene) -> do
                         foldDraw -- cram everything into one picture
                                 ( \(Pos x y, Texture bmp, VisibleInScenes entityScene) ->
                                         if scene `member` entityScene
                                                 then translate x y $ bmp
                                                 else Blank
                                 )
+                                -- p2 <- foldDrawM (\timer -> liftIO $ fmap (translate 0 150 . color white) $ viewTimer timer)
                 )
 
 viewHitboxes :: System' Picture
@@ -248,6 +249,10 @@ stepTimeToLive dt = do
                                 then cmapM (\(_ :: TimeToLive, e' :: Entity) -> if e' == e then destroy e (Proxy @DestructableComponents) else pure ())
                                 else pure ()
                 )
+
+stepClockTexture :: System' ()
+stepClockTexture = do
+        cmapM (\(timer :: Timer) -> liftIO $ fmap (Texture . translate 0 150 . color white) $ viewTimer timer)
 
 stepRoadmanPhysics :: Float -> System' ()
 stepRoadmanPhysics dt =
@@ -427,8 +432,7 @@ game = do
                 ( do
                         p1 <- view
                         -- p2 <- viewHitboxes
-                        p3 <- foldDrawM (\timer -> liftIO $ fmap (translate 0 150 . color white) $ viewTimer timer)
-                        pure $ pictures [p1, p3]
+                        pure $ pictures [p1]
                 )
                 inputController
                 ( \dt -> do
@@ -436,6 +440,7 @@ game = do
                         stepHarryPhysics dt
                         stepRoadmanPhysics dt
                         stepRoadmanSpawners dt
+                        stepClockTexture
                         stepTimeToLive dt
                         stepCheckWin
                         stepCollisionBox
