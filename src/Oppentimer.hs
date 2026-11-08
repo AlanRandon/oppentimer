@@ -10,7 +10,7 @@ module Oppentimer (oppentimerMain) where
 import Apecs hiding (Set)
 import Apecs.Gloss
 import qualified Data.Map as M
-import Data.Set (Set, fromList, member, singleton)
+import Data.Set (Set, member, singleton)
 import Graphics.Gloss (BitmapData (bitmapSize))
 import Graphics.Gloss.Juicy (loadJuicyPNG)
 import Oppentimer.Audio (haskellPlayAudio)
@@ -62,10 +62,12 @@ instance Component VisibleInScenes where type Storage VisibleInScenes = Map Visi
 newtype Texture = Texture Picture
 instance Component Texture where type Storage Texture = Map Texture
 
-roadmanWidth :: Float
+arenaWidth, arenaHeight, arenaX, arenaY, playerWidth, roadmanWidth :: Float
+arenaWidth = 300
+arenaHeight = 150
+arenaX = 0
+arenaY = -80
 roadmanWidth = 20
-
-playerWidth :: Float
 playerWidth = 20
 
 -------------------------------------------
@@ -123,7 +125,6 @@ view = do
                                                 then translate x y $ bmp
                                                 else Blank
                                 )
-                                -- p2 <- foldDrawM (\timer -> liftIO $ fmap (translate 0 150 . color white) $ viewTimer timer)
                 )
 
 viewHitboxes :: System' Picture
@@ -131,7 +132,6 @@ viewHitboxes =
         foldDraw -- hitboxes and stuff
                 ( \(Collidable (Pos x y) (Size w h)) ->
                         translate x y $ color red $ lineLoop (rectanglePath w h)
-                        -- , Texture (color white $ lineLoop $ rectanglePath arenaWidth arenaHeight)
                 )
 
 -------------------------------------------
@@ -175,6 +175,16 @@ inputControllerTitleScreen event = case event of
         EventKey (Char 'c') Down _ _ -> cmap (const BattleOppenheimer :: Scene -> Scene)
         _ -> pure ()
 
+inputControllerDeath :: Event -> System' ()
+inputControllerDeath event = case event of
+        EventKey (SpecialKey KeyEsc) Down _ _ ->
+                liftIO exitSuccess
+        EventKey (Char 'q') Down _ _ -> liftIO exitSuccess
+        EventKey (Char 'c') Down _ _ -> do
+                resetEntities
+                cmap (const BattleOppenheimer :: Scene -> Scene)
+        _ -> pure ()
+
 stepHarryPhysics :: Float -> System' ()
 stepHarryPhysics dt = do
         cmap
@@ -186,7 +196,7 @@ stepHarryPhysics dt = do
                         DirectionStationary -> Vel 0 0
                 )
         cmapM
-                ( \(Collidable (Pos x y) harrySize, Vel vX vY, Harry, harryId :: Entity) -> do
+                ( \(Pos x y, Collidable (Pos _ _) harrySize, Vel vX vY, Harry, harryId :: Entity) -> do
                         let newPos = Pos (x + vX * dt) (y + vY * dt)
                         let newHarryBox = Collidable newPos harrySize
                         isCollision <- cfold (\acc (box, id' :: Entity) -> acc || (id' /= harryId && newHarryBox `collidesWith` box)) False
@@ -227,7 +237,7 @@ stepRoadmanSpawners dt =
                                 ( \(RoadmanSpawner t roadmanBmp gen) -> do
                                         if t > 0
                                                 then pure $ RoadmanSpawner (t - dt) roadmanBmp gen
-                                                else do
+                                                else
                                                         let
                                                                 harryPos = (harryX, harryY)
                                                                 (r :: Float, gen') = randomR (80, 200) gen
@@ -235,16 +245,17 @@ stepRoadmanSpawners dt =
                                                                 offset = (r * sin theta, r * cos theta)
                                                                 roadmanPos = uncurry Pos $ offset `addVec` harryPos
                                                                 normalisedVec = normaliseVec (negateVec offset)
-                                                        newEntity_
-                                                                ( roadmanPos
-                                                                , uncurry Vel $ 80 `multVec` normalisedVec
-                                                                , roadmanBmp
-                                                                , VisibleInScenes (singleton BattleOppenheimer)
-                                                                , Collidable roadmanPos (Size roadmanWidth roadmanWidth)
-                                                                , Roadman
-                                                                , TimeToLive 10
-                                                                )
-                                                                >> (pure $ RoadmanSpawner (0.5) roadmanBmp gen'')
+                                                         in
+                                                                newEntity_
+                                                                        ( roadmanPos
+                                                                        , uncurry Vel $ 80 `multVec` normalisedVec
+                                                                        , roadmanBmp
+                                                                        , VisibleInScenes (singleton BattleOppenheimer)
+                                                                        , Collidable roadmanPos (Size roadmanWidth roadmanWidth)
+                                                                        , Roadman
+                                                                        , TimeToLive 10
+                                                                        )
+                                                                        >> (pure $ RoadmanSpawner (0.5) roadmanBmp gen'')
                                 )
                 )
 
@@ -327,6 +338,17 @@ loadSprite scale' path = do
 
         pure $ SpriteData (Size imageWidth imageHeight) (Texture imageBmp')
 
+resetEntities :: System' ()
+resetEntities = do
+        cmapM (\(Roadman, e :: Entity) -> destroy e (Proxy @DestructableComponents))
+        cmap
+                ( \(Harry) ->
+                        ( Pos arenaX arenaY
+                        , Vel 0 0
+                        , DirectionStationary
+                        )
+                )
+
 createEntities :: System' ()
 createEntities = do
         -- set the scene
@@ -335,8 +357,8 @@ createEntities = do
         ---------------------------------------
         ---          battle scene           ---
         ---------------------------------------
-        -- dan
-        SpriteData (Size oppenheimerWidth oppenheimerHeight) (Texture oppenheimerBmp) <- liftIO $ loadSprite 250 "assets/characters/oppenheimer.png"
+        -- oppenheimer
+        SpriteData (Size _oppenheimerWidth _oppenheimerHeight) (Texture oppenheimerBmp) <- liftIO $ loadSprite 250 "assets/characters/oppenheimer.png"
         newEntity_
                 ( Pos 0 70
                 , VisibleInScenes (singleton BattleOppenheimer)
@@ -382,17 +404,14 @@ createEntities = do
         -- harry
         SpriteData (Size harryWidth harryHeight) (Texture harryBmp) <- liftIO $ loadSprite playerWidth "assets/characters/harry.png"
         newEntity_
-                ( Pos (arenaX) (arenaY)
-                , Harry
-                , Vel 0 0
+                ( Harry
                 , Texture harryBmp
-                , DirectionStationary
                 , Collidable (Pos arenaX arenaY) (Size harryWidth harryHeight)
                 , VisibleInScenes (singleton BattleOppenheimer)
                 )
 
         -- roadman
-        SpriteData (Size roadmanWidth roadmanHeight) (Texture roadmanBmp) <- liftIO $ loadSprite roadmanWidth "assets/characters/roadman.png"
+        SpriteData (Size _roadmanWidth _roadmanHeight) (Texture roadmanBmp) <- liftIO $ loadSprite roadmanWidth "assets/characters/roadman.png"
         newEntity_
                 (RoadmanSpawner 0 (Texture roadmanBmp) (mkStdGen 0))
 
@@ -412,18 +431,16 @@ createEntities = do
                 , Texture (translate 100 100 $ scale 0.1 0.1 $ color white $ text "You are dead")
                 , VisibleInScenes (singleton Death)
                 )
+
         -- battle pass
-        SpriteData (Size battlePassWidth battlePassHeight) (Texture battlePassBmp) <- liftIO $ loadSprite 300 "assets/other/BATTLEPASS.png"
+        SpriteData (Size _battlePassWidth _battlePassHeight) (Texture battlePassBmp) <- liftIO $ loadSprite 300 "assets/other/BATTLEPASS.png"
         newEntity_
                 ( Pos 0 0
                 , Texture (battlePassBmp)
                 , VisibleInScenes (singleton Death)
                 )
-    where
-        arenaWidth = 300
-        arenaHeight = 150
-        arenaX = 0
-        arenaY = -80
+
+        resetEntities
 
 -------------------------------------------
 -- Run game
@@ -448,7 +465,8 @@ game = do
                                         case scene of
                                                 BattleOppenheimer -> inputControllerBattle event
                                                 TitleScreen -> inputControllerTitleScreen event
-                                                _ -> pure ()
+                                                Death -> inputControllerDeath event
+                                                Win -> pure ()
                                 )
                 )
                 ( \dt -> do
@@ -493,5 +511,5 @@ game = do
 oppentimerMain :: IO ()
 oppentimerMain = do
         w <- initModel
-        audioResult <- haskellPlayAudio "src/AUDIO_FFI_STUFF/foxy-scream-fnaf-1.mp3"
+        _ <- haskellPlayAudio "src/AUDIO_FFI_STUFF/foxy-scream-fnaf-1.mp3"
         runWith w game
