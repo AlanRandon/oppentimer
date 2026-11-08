@@ -14,6 +14,7 @@
         {
           self',
           pkgs,
+          lib,
           ...
         }:
         {
@@ -23,14 +24,18 @@
             settings = { };
 
             devShell = {
-              mkShellArgs = {
+              mkShellArgs = rec {
                 nativeBuildInputs = with pkgs; [
                   miniaudio.dev
                 ];
 
                 buildInputs = with pkgs; [
+                  alsa-lib
+                  libpulseaudio
                   miniaudio
                 ];
+
+                LD_LIBRARY_PATH = lib.makeLibraryPath buildInputs;
               };
             };
           };

@@ -331,7 +331,7 @@ stepRoadmanSpawners dt =
                                                                 normalisedVec = normaliseVec (negateVec offset)
                                                                 vel = uncurry Vel $ speed `multVec` normalisedVec
                                                          in
-                                                                ( if variant < 0.1
+                                                                ( if variant < 1 / 20
                                                                         then
                                                                                 newEntity_
                                                                                         ( roadmanPos
