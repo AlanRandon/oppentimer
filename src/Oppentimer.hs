@@ -53,7 +53,7 @@ instance Component RoadmanSpawner where type Storage RoadmanSpawner = Map Roadma
 data Roadman = Roadman
 instance Component Roadman where type Storage Roadman = Map Roadman
 
-data Scene = BattleOppenheimer | Death | Win deriving (Eq, Ord)
+data Scene = BattleOppenheimer | Death | Win | TitleScreen deriving (Eq, Ord)
 instance Component Scene where type Storage Scene = Map Scene
 
 data VisibleInScenes = VisibleInScenes (Set Scene)
@@ -155,16 +155,24 @@ directionBinds =
                 , (SpecialKey KeyRight, DirectionRight)
                 ]
 
-inputController :: Event -> System' ()
-inputController event = case event of
+inputControllerBattle :: Event -> System' ()
+inputControllerBattle event = case event of
         EventKey (SpecialKey KeyEsc) Down _ _ ->
                 liftIO exitSuccess
         EventKey (Char 'q') Down _ _ -> liftIO exitSuccess
-        EventKey (Char '`') Down _ _ -> cmap (const Death :: Scene -> Scene)
+        EventKey (Char '`') Down _ _ -> cmap (const Win :: Scene -> Scene)
         EventKey (k) Down _ _ -> case k `M.lookup` directionBinds of
                 Just bind -> cmap (const bind :: Direction -> Direction)
                 Nothing -> pure ()
-        EventKey (Char _) Up _ _ -> cmap (const DirectionStationary :: Direction -> Direction)
+        EventKey _ Up _ _ -> cmap (const DirectionStationary :: Direction -> Direction)
+        _ -> pure ()
+
+inputControllerTitleScreen :: Event -> System' ()
+inputControllerTitleScreen event = case event of
+        EventKey (SpecialKey KeyEsc) Down _ _ ->
+                liftIO exitSuccess
+        EventKey (Char 'q') Down _ _ -> liftIO exitSuccess
+        EventKey (Char 'c') Down _ _ -> cmap (const BattleOppenheimer :: Scene -> Scene)
         _ -> pure ()
 
 stepHarryPhysics :: Float -> System' ()
@@ -322,7 +330,7 @@ loadSprite scale' path = do
 createEntities :: System' ()
 createEntities = do
         -- set the scene
-        newEntity_ BattleOppenheimer
+        newEntity_ TitleScreen
 
         ---------------------------------------
         ---          battle scene           ---
@@ -434,16 +442,30 @@ game = do
                         -- p2 <- viewHitboxes
                         pure $ pictures [p1]
                 )
-                inputController
+                ( \event -> do
+                        cmapM_
+                                ( \(scene :: Scene) -> do
+                                        case scene of
+                                                BattleOppenheimer -> inputControllerBattle event
+                                                TitleScreen -> inputControllerTitleScreen event
+                                                _ -> pure ()
+                                )
+                )
                 ( \dt -> do
-                        stepHarryPhysics dt
-                        stepHarryPhysics dt
-                        stepRoadmanPhysics dt
-                        stepRoadmanSpawners dt
-                        stepClockTexture
+                        cmapM_
+                                ( \(scene :: Scene) -> do
+                                        case scene of
+                                                BattleOppenheimer -> do
+                                                        stepHarryPhysics dt
+                                                        stepHarryPhysics dt
+                                                        stepRoadmanPhysics dt
+                                                        stepRoadmanSpawners dt
+                                                        stepClockTexture
+                                                        stepCheckWin
+                                                        stepCollisionBox
+                                                _ -> pure ()
+                                )
                         stepTimeToLive dt
-                        stepCheckWin
-                        stepCollisionBox
                         cmap (tickTimer dt)
                 )
     where
