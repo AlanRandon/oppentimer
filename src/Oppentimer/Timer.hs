@@ -4,7 +4,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module Oppentimer.Timer (Timer, tickTimer, newTimer, isExpired) where
+module Oppentimer.Timer (Timer, tickTimer, newTimer, isExpired, getTime) where
 
 import Apecs (Component (..), Map)
 import Text.Printf (printf)
@@ -23,6 +23,10 @@ instance Show Timer where
 
 newTimer :: Float -> Timer
 newTimer = Running . TimeSeconds
+
+getTime :: Timer -> Float
+getTime Ended = 0
+getTime (Running (TimeSeconds t)) = t
 
 tickTimer :: Float -> Timer -> Timer
 tickTimer _ Ended = Ended

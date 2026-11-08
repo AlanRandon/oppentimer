@@ -16,10 +16,10 @@ import Graphics.Gloss (BitmapData (bitmapSize))
 import Graphics.Gloss.Juicy (loadJuicyPNG)
 import Oppentimer.Audio (haskellPlayAudio)
 import Oppentimer.Text (centerText)
-import Oppentimer.Timer (Timer, isExpired, newTimer, tickTimer)
+import Oppentimer.Timer (Timer, getTime, isExpired, newTimer, tickTimer)
 import Oppentimer.Vector (addVec, multVec, negateVec, normaliseVec)
 import System.Exit (exitSuccess)
-import System.Random (Random (randomR), StdGen, mkStdGen)
+import System.Random (Random (randomR), StdGen, initStdGen, mkStdGen)
 
 -------------------------------------------
 -- Components
@@ -50,9 +50,13 @@ instance Component TimeToLive where type Storage TimeToLive = Map TimeToLive
 data Harry = Harry
 instance Component Harry where type Storage Harry = Map Harry
 
+data Wallace = Wallace
+instance Component Wallace where type Storage Wallace = Map Wallace
+
 data RoadmanSpawner = RoadmanSpawner
         { spawnerDelay :: Float
         , spawnerRoadmanTexture :: Texture
+        , spawnerWallaceTexture :: Texture
         , spawnerGen :: StdGen
         }
 
@@ -73,13 +77,15 @@ instance Component Texture where type Storage Texture = Map Texture
 data CenteredText = CenteredText String Color Float deriving (Show)
 instance Component CenteredText where type Storage CenteredText = Map CenteredText
 
-arenaWidth, arenaHeight, arenaX, arenaY, playerWidth, roadmanWidth :: Float
+arenaWidth, arenaHeight, arenaX, arenaY, playerWidth, roadmanWidth, survivalTime, harryVelocity :: Float
 arenaWidth = 300
 arenaHeight = 150
 arenaX = 0
 arenaY = -80
 roadmanWidth = 10
 playerWidth = 20
+survivalTime = 5 * 60
+harryVelocity = 50
 
 -------------------------------------------
 -- Model
@@ -102,6 +108,7 @@ makeWorld
         , ''VisibleInScenes
         , ''CenteredText
         , ''Timer
+        , ''Wallace
         ]
 
 type System' a = System Model a
@@ -121,6 +128,7 @@ type DestructableComponents =
           , Pos
           , Vel
           , CenteredText
+          , Wallace
           )
         )
 
@@ -132,12 +140,26 @@ view :: System' Picture
 view = do
         foldDrawM
                 ( \(scene :: Scene) -> do
-                        foldDraw -- cram everything into one picture
-                                ( \(Pos x y, Texture bmp, VisibleInScenes entityScene) ->
-                                        if scene `member` entityScene
-                                                then translate x y $ bmp
-                                                else Blank
-                                )
+                        p1 <-
+                                foldDraw
+                                        ( \(Pos x y, timer :: Timer, VisibleInScenes entityScenes) ->
+                                                if scene `member` entityScenes
+                                                        then
+                                                                translate x y $
+                                                                        color red $
+                                                                                rectangleSolid
+                                                                                        (getTime timer / survivalTime * 300 + 100)
+                                                                                        75
+                                                        else Blank
+                                        )
+                        p2 <-
+                                foldDraw -- cram everything into one picture
+                                        ( \(Pos x y, Texture bmp, VisibleInScenes entityScenes) ->
+                                                if scene `member` entityScenes
+                                                        then translate x y $ bmp
+                                                        else Blank
+                                        )
+                        pure $ pictures [p1, p2]
                 )
 
 viewHitboxes :: System' Picture
@@ -213,10 +235,10 @@ stepHarryPhysics :: Float -> System' ()
 stepHarryPhysics dt = do
         cmap
                 ( \(d, Vel _ _, Harry) -> case d of
-                        DirectionLeft -> Vel (-velocity) 0
-                        DirectionRight -> Vel velocity 0
-                        DirectionUp -> Vel 0 velocity
-                        DirectionDown -> Vel 0 (-velocity)
+                        DirectionLeft -> Vel (-harryVelocity) 0
+                        DirectionRight -> Vel harryVelocity 0
+                        DirectionUp -> Vel 0 harryVelocity
+                        DirectionDown -> Vel 0 (-harryVelocity)
                         DirectionStationary -> Vel 0 0
                 )
         -- collide with walls
@@ -235,19 +257,36 @@ stepHarryPhysics dt = do
                 )
         -- collide with roadmen
         cmapM
-                ( \(harryPos, harryBox, Harry, harryId :: Entity) -> do
+                ( \(harryPos, harryBox, Harry) -> do
                         isCollision <-
                                 cfold
-                                        ( \acc (pos, box, Roadman, id' :: Entity) ->
-                                                acc || (id' /= harryId && (harryPos, harryBox) `collidesWith` (pos, box))
+                                        ( \acc (pos, box, Roadman) ->
+                                                acc || ((harryPos, harryBox) `collidesWith` (pos, box))
                                         )
                                         False
                         if isCollision
                                 then cmap (const Death :: Scene -> Scene)
                                 else pure ()
                 )
-    where
-        velocity = 50
+        -- collide with wallace
+        cmapM
+                ( \(harryPos, harryBox, Harry) -> do
+                        wallaceId <-
+                                cfold
+                                        ( \acc (pos, box, Wallace, id' :: Entity) ->
+                                                case acc of
+                                                        Just id'' -> Just id''
+                                                        Nothing ->
+                                                                if (harryPos, harryBox) `collidesWith` (pos, box)
+                                                                        then Just id'
+                                                                        else Nothing
+                                        )
+                                        Nothing
+                        case wallaceId of
+                                Just wallaceId' -> do
+                                        destroy wallaceId' (Proxy @DestructableComponents)
+                                Nothing -> pure ()
+                )
 
 stepRoadmanSpawners :: Float -> System' ()
 stepRoadmanSpawners dt =
@@ -263,20 +302,34 @@ stepRoadmanSpawners dt =
                                                                 gen = spawnerGen spawner
                                                                 (r :: Float, gen') = randomR (200, 300) gen
                                                                 (theta :: Float, gen'') = randomR (0, 2 * pi) gen'
+                                                                (variant :: Float, gen''') = randomR (0, 1) gen''
                                                                 offset = (r * sin theta, r * cos theta)
                                                                 roadmanPos = uncurry Pos $ offset `addVec` harryPos
                                                                 normalisedVec = normaliseVec (negateVec offset)
                                                          in
-                                                                newEntity_
-                                                                        ( roadmanPos
-                                                                        , uncurry Vel $ 80 `multVec` normalisedVec
-                                                                        , spawnerRoadmanTexture spawner
-                                                                        , VisibleInScenes (singleton BattleOppenheimer)
-                                                                        , Collidable (Size roadmanWidth roadmanWidth)
-                                                                        , Roadman
-                                                                        , TimeToLive 10
-                                                                        )
-                                                                        >> (pure $ spawner{spawnerDelay = 0.5, spawnerGen = gen''})
+                                                                ( if variant < 0.1
+                                                                        then
+                                                                                newEntity_
+                                                                                        ( roadmanPos
+                                                                                        , uncurry Vel $ 80 `multVec` normalisedVec
+                                                                                        , spawnerWallaceTexture spawner
+                                                                                        , VisibleInScenes (singleton BattleOppenheimer)
+                                                                                        , Collidable (Size roadmanWidth roadmanWidth)
+                                                                                        , Wallace
+                                                                                        , TimeToLive 10
+                                                                                        )
+                                                                        else
+                                                                                newEntity_
+                                                                                        ( roadmanPos
+                                                                                        , uncurry Vel $ 80 `multVec` normalisedVec
+                                                                                        , spawnerRoadmanTexture spawner
+                                                                                        , VisibleInScenes (singleton BattleOppenheimer)
+                                                                                        , Collidable (Size roadmanWidth roadmanWidth)
+                                                                                        , Roadman
+                                                                                        , TimeToLive 10
+                                                                                        )
+                                                                )
+                                                                        >> (pure $ spawner{spawnerDelay = 0.5, spawnerGen = gen'''})
                                 )
                 )
 
@@ -370,7 +423,7 @@ resetEntities = do
                         , DirectionStationary
                         )
                 )
-        cmap (\(_ :: Timer) -> newTimer ({- 5 * 60 -} 10))
+        cmap (\(_ :: Timer) -> newTimer survivalTime)
         cmap (\(spawner :: RoadmanSpawner) -> spawner{spawnerDelay = 1.0})
 
 createEntities :: System' ()
@@ -439,12 +492,15 @@ createEntities = do
                 , VisibleInScenes (singleton BattleOppenheimer)
                 )
 
-        SpriteData (Size _roadmanWidth _roadmanHeight) (Texture roadmanBmp) <- liftIO $ loadSprite roadmanWidth "assets/characters/roadman.png"
+        SpriteData _ (Texture roadmanBmp) <- liftIO $ loadSprite roadmanWidth "assets/characters/roadman.png"
+        SpriteData _ (Texture wallaceBmp) <- liftIO $ loadSprite roadmanWidth "assets/characters/ybj_wallace.png"
+        gen <- liftIO initStdGen
         newEntity_
                 RoadmanSpawner
                         { spawnerDelay = 0
                         , spawnerRoadmanTexture = (Texture roadmanBmp)
-                        , spawnerGen = (mkStdGen 0)
+                        , spawnerWallaceTexture = (Texture wallaceBmp)
+                        , spawnerGen = gen
                         }
 
         -- oppentimer
