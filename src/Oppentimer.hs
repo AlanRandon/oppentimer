@@ -19,7 +19,7 @@ import Oppentimer.Text (centerText)
 import Oppentimer.Timer (Timer, getTime, isExpired, newTimer, tickTimer)
 import Oppentimer.Vector (addVec, multVec, negateVec, normaliseVec)
 import System.Exit (exitSuccess)
-import System.Random (Random (randomR), StdGen, initStdGen, mkStdGen)
+import System.Random (Random (randomR), StdGen, initStdGen)
 
 -------------------------------------------
 -- Components
@@ -47,7 +47,18 @@ instance Component Collidable where type Storage Collidable = Map Collidable
 data TimeToLive = TimeToLive Float
 instance Component TimeToLive where type Storage TimeToLive = Map TimeToLive
 
+data HarryState = HarryNormal | HarryEvil Int
+
+harryStateHit :: HarryState -> HarryState
+harryStateHit HarryNormal = HarryNormal
+harryStateHit (HarryEvil 0) = HarryNormal
+harryStateHit (HarryEvil remainingHits) = HarryEvil (remainingHits - 1)
+
 data Harry = Harry
+        { harryNormalTexture :: Texture
+        , harryEvilTexture :: Texture
+        , harryState :: HarryState
+        }
 instance Component Harry where type Storage Harry = Map Harry
 
 data Wallace = Wallace
@@ -234,64 +245,67 @@ inputControllerWin = inputControllerDeath
 stepHarryPhysics :: Float -> System' ()
 stepHarryPhysics dt = do
         cmap
-                ( \(d, Vel _ _, Harry) -> case d of
+                ( \(d, Vel _ _, _ :: Harry) -> case d of
                         DirectionLeft -> Vel (-harryVelocity) 0
                         DirectionRight -> Vel harryVelocity 0
                         DirectionUp -> Vel 0 harryVelocity
                         DirectionDown -> Vel 0 (-harryVelocity)
                         DirectionStationary -> Vel 0 0
                 )
-        -- collide with walls
         cmapM
-                ( \(Pos x y, harryBox, Vel vX vY, Harry, harryId :: Entity) -> do
-                        let newPos = Pos (x + vX * dt) (y + vY * dt)
-                        isCollision <-
-                                cfold
-                                        ( \acc (pos, box, id' :: Entity) ->
-                                                acc || (id' /= harryId && (newPos, harryBox) `collidesWith` (pos, box))
-                                        )
-                                        False
-                        if isCollision
-                                then pure (Pos x y, Vel 0 0)
-                                else pure (newPos, Vel vX vY)
+                ( \(harryPos :: Pos, harryBox, Vel vX vY, harry :: Harry, harryId :: Entity) -> do
+                        -- collide with walls
+                        _ <- do
+                                let Pos x y = harryPos
+                                let newPos = Pos (x + vX * dt) (y + vY * dt)
+                                isCollision <-
+                                        cfold
+                                                ( \acc (pos, box, id' :: Entity) ->
+                                                        acc || (id' /= harryId && (newPos, harryBox) `collidesWith` (pos, box))
+                                                )
+                                                False
+                                if isCollision
+                                        then pure (Pos x y, Vel 0 0)
+                                        else pure (newPos, Vel vX vY)
+
+                        -- collide with roadmen
+                        cmapM_
+                                ( \(pos, box, Roadman, roadmanId :: Entity) -> do
+                                        let collision = (harryPos, harryBox) `collidesWith` (pos, box)
+                                        case harryState harry of
+                                                HarryNormal ->
+                                                        if collision
+                                                                then cmap (const Death :: Scene -> Scene)
+                                                                else pure ()
+                                                HarryEvil _ ->
+                                                        if collision
+                                                                then do
+                                                                        destroy roadmanId (Proxy @DestructableComponents)
+                                                                        set harryId harry{harryState = harryStateHit $ harryState harry}
+                                                                else pure ()
+                                )
+                        -- collide with wallace
+                        cmapM_
+                                ( \(pos, box, Wallace, wallaceId :: Entity) -> do
+                                        let collision = (harryPos, harryBox) `collidesWith` (pos, box)
+                                        if collision
+                                                then do
+                                                        destroy wallaceId (Proxy @DestructableComponents)
+                                                        set harryId harry{harryState = HarryEvil 3}
+                                                else pure ()
+                                )
                 )
-        -- collide with roadmen
-        cmapM
-                ( \(harryPos, harryBox, Harry) -> do
-                        isCollision <-
-                                cfold
-                                        ( \acc (pos, box, Roadman) ->
-                                                acc || ((harryPos, harryBox) `collidesWith` (pos, box))
-                                        )
-                                        False
-                        if isCollision
-                                then cmap (const Death :: Scene -> Scene)
-                                else pure ()
-                )
-        -- collide with wallace
-        cmapM
-                ( \(harryPos, harryBox, Harry) -> do
-                        wallaceId <-
-                                cfold
-                                        ( \acc (pos, box, Wallace, id' :: Entity) ->
-                                                case acc of
-                                                        Just id'' -> Just id''
-                                                        Nothing ->
-                                                                if (harryPos, harryBox) `collidesWith` (pos, box)
-                                                                        then Just id'
-                                                                        else Nothing
-                                        )
-                                        Nothing
-                        case wallaceId of
-                                Just wallaceId' -> do
-                                        destroy wallaceId' (Proxy @DestructableComponents)
-                                Nothing -> pure ()
+        cmap
+                ( \(harry :: Harry) -> do
+                        case harryState harry of
+                                HarryNormal -> (harryNormalTexture harry)
+                                HarryEvil _ -> (harryEvilTexture harry)
                 )
 
 stepRoadmanSpawners :: Float -> System' ()
 stepRoadmanSpawners dt =
         cmapM
-                ( \(Harry, Pos harryX harryY) ->
+                ( \(_ :: Harry, Pos harryX harryY) ->
                         cmapM
                                 ( \(spawner) -> do
                                         if spawnerDelay spawner > 0
@@ -416,11 +430,13 @@ loadSprite scale' path = do
 resetEntities :: System' ()
 resetEntities = do
         cmapM (\(Roadman, e :: Entity) -> destroy e (Proxy @DestructableComponents))
+        cmapM (\(Wallace, e :: Entity) -> destroy e (Proxy @DestructableComponents))
         cmap
-                ( \(Harry) ->
+                ( \(harry :: Harry) ->
                         ( Pos arenaX arenaY
                         , Vel 0 0
                         , DirectionStationary
+                        , harry{harryState = HarryNormal}
                         )
                 )
         cmap (\(_ :: Timer) -> newTimer survivalTime)
@@ -483,11 +499,20 @@ createEntities = do
 
         SpriteData
                 harrySize
-                (Texture harryBmp) <-
+                (Texture harryNormalBmp) <-
                 liftIO $ loadSprite playerWidth "assets/characters/harry.png"
+
+        SpriteData
+                _
+                (Texture harryEvilBmp) <-
+                liftIO $ loadSprite playerWidth "assets/characters/harry-evil.png"
+
         newEntity_
                 ( Harry
-                , Texture harryBmp
+                        { harryNormalTexture = Texture harryNormalBmp
+                        , harryEvilTexture = Texture harryEvilBmp
+                        , harryState = HarryNormal
+                        }
                 , Collidable harrySize
                 , VisibleInScenes (singleton BattleOppenheimer)
                 )

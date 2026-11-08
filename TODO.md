@@ -4,8 +4,8 @@
     - [x] player collisions
     - [x] restart
     - [ ] title cutscene
-    - [ ] ybj wallace
-    - [ ] evil harry
+    - [x] ybj wallace
+    - [x] evil harry
     - [x] win screen
     - [ ] fixed resolution window
     - [ ] force fullscreen
